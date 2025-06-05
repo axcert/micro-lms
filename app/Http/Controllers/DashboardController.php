@@ -3,13 +3,21 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * Display the dashboard based on user role
+     * 
+     * @return \Inertia\Response|\Illuminate\Http\RedirectResponse
+     */
+    public function index()
     {
-        $user = $request->user();
+        $user = Auth::user();
         
         // Redirect to role-specific dashboard
         switch ($user->role) {
@@ -20,61 +28,10 @@ class DashboardController extends Controller
             case 'student':
                 return redirect()->route('student.dashboard');
             default:
-                return redirect()->route('login');
+                // Fallback dashboard for unknown roles
+                return Inertia::render('Dashboard/Default', [
+                    'user' => $user,
+                ]);
         }
-    }
-    
-    public function admin(Request $request)
-    {
-        // TODO: Fetch real stats from database
-        $stats = [
-            'total_users' => 125,
-            'total_students' => 100,
-            'total_teachers' => 20,
-            'total_batches' => 15,
-            'total_classes' => 45,
-            'total_quizzes' => 30,
-            'active_students' => 85,
-        ];
-        
-        return Inertia::render('Dashboard/Admin', [
-            'stats' => $stats,
-        ]);
-    }
-    
-    public function teacher(Request $request)
-    {
-        $user = $request->user();
-        
-        // TODO: Fetch real data from database
-        $batches = [];
-        $upcomingClasses = [];
-        $recentQuizzes = [];
-        $stats = [
-            'total_batches' => 5,
-            'upcoming_classes' => 3,
-            'pending_quizzes' => 2,
-        ];
-        
-        return Inertia::render('Dashboard/Teacher', [
-            'batches' => $batches,
-            'upcomingClasses' => $upcomingClasses,
-            'recentQuizzes' => $recentQuizzes,
-            'stats' => $stats,
-        ]);
-    }
-    
-    public function student(Request $request)
-    {
-        $user = $request->user();
-        
-        // TODO: Fetch real data from database
-        $upcomingClasses = [];
-        $pendingQuizzes = [];
-        
-        return Inertia::render('Dashboard/Student', [
-            'upcomingClasses' => $upcomingClasses,
-            'pendingQuizzes' => $pendingQuizzes,
-        ]);
     }
 }

@@ -27,6 +27,7 @@ class RegisteredUserController extends Controller
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'phone' => 'required|string|max:20',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'role' => 'required|in:student,teacher,admin',
         ]);
 
         $user = User::create([
@@ -34,13 +35,31 @@ class RegisteredUserController extends Controller
             'email' => $request->email,
             'phone' => $request->phone,
             'password' => Hash::make($request->password),
-            'role' => 'student', // Default role
+            'role' => $request->role,
         ]);
 
         event(new Registered($user));
 
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        // Redirect based on role
+        return $this->redirectBasedOnRole($user);
+    }
+
+    /**
+     * Redirect user based on their role after registration
+     */
+    private function redirectBasedOnRole(User $user): RedirectResponse
+    {
+        switch($user->role) {
+            case 'admin':
+                return redirect()->route('admin.dashboard');
+            case 'teacher':
+                return redirect()->route('teacher.dashboard');
+            case 'student':
+                return redirect()->route('student.dashboard');
+            default:
+                return redirect()->route('dashboard');
+        }
     }
 }
