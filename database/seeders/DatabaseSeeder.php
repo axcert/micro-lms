@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -13,11 +12,21 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->command->info('🌱 Starting database seeding...');
+        
+        // Call seeders in correct order
+        $this->call([
+            UserSeeder::class,      // Create users first
+            BatchSeeder::class,     // Create batches (needs users)
+            QuizSeeder::class,      // Create quizzes (needs users and batches)
         ]);
+        
+        $this->command->info('✅ Database seeding completed successfully!');
+        $this->command->line('');
+        $this->command->info('🔑 Demo Login Credentials:');
+        $this->command->line('👑 Admin: admin@mlms.com');
+        $this->command->line('👨‍🏫 Teacher: teacher@mlms.com');
+        $this->command->line('👨‍🎓 Student: student@mlms.com');
+        $this->command->line('🔒 Password: password');
     }
 }

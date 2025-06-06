@@ -1,3 +1,9 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
 return new class extends Migration
 {
     public function up(): void
@@ -7,8 +13,8 @@ return new class extends Migration
             $table->string('title');
             $table->text('description')->nullable();
             $table->foreignId('batch_id')->constrained()->onDelete('cascade');
-            $table->timestamp('start_time');
-            $table->timestamp('end_time');
+            $table->timestamp('start_time')->nullable();
+            $table->timestamp('end_time')->nullable();
             $table->integer('duration_minutes');
             $table->integer('total_marks')->default(0);
             $table->boolean('randomize_questions')->default(true);

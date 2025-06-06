@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::create('batch_students', function (Blueprint $table) {
             $table->id();
             
-            // Foreign key relationships with modern syntax
-            $table->foreignId('batch_id')->constrained('batches')->cascadeOnDelete();
-            $table->foreignId('student_id')->constrained('users')->cascadeOnDelete();
+            // Foreign key relationships
+            $table->foreignId('batch_id')->constrained('batches')->onDelete('cascade');
+            $table->foreignId('student_id')->constrained('users')->onDelete('cascade');
             
             // Enrollment tracking
             $table->timestamp('enrolled_at')->nullable();
@@ -25,16 +25,14 @@ return new class extends Migration
             $table->timestamps();
             
             // Unique constraint - student can only be enrolled once per batch
-            $table->unique(['batch_id', 'student_id'], 'batch_students_unique');
+            $table->unique(['batch_id', 'student_id']);
             
             // Indexes for performance
-            $table->index('batch_id', 'batch_students_batch_index');
-            $table->index('student_id', 'batch_students_student_index');
-            $table->index('enrolled_at', 'batch_students_enrolled_at_index');
-            $table->index(['batch_id', 'enrolled_at'], 'batch_students_batch_enrolled_index');
-            
-            // Additional index for teacher queries (finding all students for teacher's batches)
-            $table->index(['student_id', 'created_at'], 'batch_students_student_created_index');
+            $table->index('batch_id');
+            $table->index('student_id');
+            $table->index('enrolled_at');
+            $table->index(['batch_id', 'enrolled_at']);
+            $table->index(['student_id', 'created_at']);
         });
     }
 
@@ -45,4 +43,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('batch_students');
     }
-};
+};DB::select('SHOW TABLES');
