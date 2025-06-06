@@ -19,7 +19,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             
             // Teacher relationship
-            $table->unsignedBigInteger('teacher_id');
+            $table->foreignId('teacher_id')->constrained('users')->cascadeOnDelete();
             
             // Date fields
             $table->date('start_date');
@@ -33,12 +33,6 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
             
-            // Foreign key constraints
-            $table->foreign('teacher_id')
-                  ->references('id')
-                  ->on('users')
-                  ->onDelete('cascade');
-            
             // Indexes for performance
             $table->index(['teacher_id', 'is_active'], 'batches_teacher_active_index');
             $table->index(['start_date', 'end_date'], 'batches_date_range_index');
@@ -47,19 +41,6 @@ return new class extends Migration
             
             // Unique constraint to prevent duplicate batch names per teacher
             $table->unique(['teacher_id', 'name'], 'batches_teacher_name_unique');
-            
-            // Check constraints (if your database supports them)
-            if (config('database.default') === 'mysql') {
-                // MySQL check constraints (MySQL 8.0.16+)
-                $table->rawIndex(
-                    "CHECK (max_students IS NULL OR max_students > 0)",
-                    'batches_max_students_positive'
-                );
-                $table->rawIndex(
-                    "CHECK (end_date IS NULL OR end_date >= start_date)",
-                    'batches_date_range_valid'
-                );
-            }
         });
     }
 

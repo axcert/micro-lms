@@ -14,26 +14,15 @@ return new class extends Migration
         Schema::create('batch_students', function (Blueprint $table) {
             $table->id();
             
-            // Foreign key relationships
-            $table->unsignedBigInteger('batch_id');
-            $table->unsignedBigInteger('student_id');
+            // Foreign key relationships with modern syntax
+            $table->foreignId('batch_id')->constrained('batches')->cascadeOnDelete();
+            $table->foreignId('student_id')->constrained('users')->cascadeOnDelete();
             
             // Enrollment tracking
             $table->timestamp('enrolled_at')->nullable();
             
             // Standard timestamps
             $table->timestamps();
-            
-            // Foreign key constraints
-            $table->foreign('batch_id')
-                  ->references('id')
-                  ->on('batches')
-                  ->onDelete('cascade');
-                  
-            $table->foreign('student_id')
-                  ->references('id')
-                  ->on('users')
-                  ->onDelete('cascade');
             
             // Unique constraint - student can only be enrolled once per batch
             $table->unique(['batch_id', 'student_id'], 'batch_students_unique');
