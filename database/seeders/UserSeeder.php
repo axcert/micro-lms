@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\User;
+use App\Enums\UserRole;
 use Illuminate\Support\Facades\Hash;
 
 class UserSeeder extends Seeder
@@ -20,7 +21,7 @@ class UserSeeder extends Seeder
             'email' => 'admin@mlms.com',
             'phone' => '+94771234567',
             'password' => Hash::make('password'),
-            'role' => 'admin',
+            'role' => UserRole::ADMIN,
             'email_verified_at' => now(),
         ]);
 
@@ -30,7 +31,7 @@ class UserSeeder extends Seeder
             'email' => 'teacher@mlms.com',
             'phone' => '+94772345678',
             'password' => Hash::make('password'),
-            'role' => 'teacher',
+            'role' => UserRole::TEACHER,
             'email_verified_at' => now(),
         ]);
 
@@ -39,7 +40,7 @@ class UserSeeder extends Seeder
             'email' => 'sarah.wilson@mlms.com',
             'phone' => '+94773456789',
             'password' => Hash::make('password'),
-            'role' => 'teacher',
+            'role' => UserRole::TEACHER,
             'email_verified_at' => now(),
         ]);
 
@@ -48,7 +49,7 @@ class UserSeeder extends Seeder
             'email' => 'michael.brown@mlms.com',
             'phone' => '+94774567890',
             'password' => Hash::make('password'),
-            'role' => 'teacher',
+            'role' => UserRole::TEACHER,
             'email_verified_at' => now(),
         ]);
 
@@ -58,7 +59,7 @@ class UserSeeder extends Seeder
             'email' => 'student@mlms.com',
             'phone' => '+94775678901',
             'password' => Hash::make('password'),
-            'role' => 'student',
+            'role' => UserRole::STUDENT,
             'email_verified_at' => now(),
         ]);
 
@@ -67,7 +68,7 @@ class UserSeeder extends Seeder
             'email' => 'james.johnson@mlms.com',
             'phone' => '+94776789012',
             'password' => Hash::make('password'),
-            'role' => 'student',
+            'role' => UserRole::STUDENT,
             'email_verified_at' => now(),
         ]);
 
@@ -76,7 +77,7 @@ class UserSeeder extends Seeder
             'email' => 'olivia.miller@mlms.com',
             'phone' => '+94777890123',
             'password' => Hash::make('password'),
-            'role' => 'student',
+            'role' => UserRole::STUDENT,
             'email_verified_at' => now(),
         ]);
 
@@ -85,7 +86,7 @@ class UserSeeder extends Seeder
             'email' => 'william.garcia@mlms.com',
             'phone' => '+94778901234',
             'password' => Hash::make('password'),
-            'role' => 'student',
+            'role' => UserRole::STUDENT,
             'email_verified_at' => now(),
         ]);
 
@@ -94,7 +95,7 @@ class UserSeeder extends Seeder
             'email' => 'sophia.martinez@mlms.com',
             'phone' => '+94779012345',
             'password' => Hash::make('password'),
-            'role' => 'student',
+            'role' => UserRole::STUDENT,
             'email_verified_at' => now(),
         ]);
 
@@ -103,7 +104,7 @@ class UserSeeder extends Seeder
             'email' => 'benjamin.anderson@mlms.com',
             'phone' => '+94770123456',
             'password' => Hash::make('password'),
-            'role' => 'student',
+            'role' => UserRole::STUDENT,
             'email_verified_at' => now(),
         ]);
 
@@ -112,7 +113,7 @@ class UserSeeder extends Seeder
             'email' => 'isabella.taylor@mlms.com',
             'phone' => '+94771234560',
             'password' => Hash::make('password'),
-            'role' => 'student',
+            'role' => UserRole::STUDENT,
             'email_verified_at' => now(),
         ]);
 
@@ -121,7 +122,7 @@ class UserSeeder extends Seeder
             'email' => 'alexander.thomas@mlms.com',
             'phone' => '+94772345601',
             'password' => Hash::make('password'),
-            'role' => 'student',
+            'role' => UserRole::STUDENT,
             'email_verified_at' => now(),
         ]);
 
@@ -130,7 +131,7 @@ class UserSeeder extends Seeder
             'email' => 'mia.hernandez@mlms.com',
             'phone' => '+94773456012',
             'password' => Hash::make('password'),
-            'role' => 'student',
+            'role' => UserRole::STUDENT,
             'email_verified_at' => now(),
         ]);
 
@@ -139,7 +140,7 @@ class UserSeeder extends Seeder
             'email' => 'ethan.moore@mlms.com',
             'phone' => '+94774560123',
             'password' => Hash::make('password'),
-            'role' => 'student',
+            'role' => UserRole::STUDENT,
             'email_verified_at' => now(),
         ]);
 
@@ -148,18 +149,18 @@ class UserSeeder extends Seeder
             'email' => 'charlotte.jackson@mlms.com',
             'phone' => '+94775601234',
             'password' => Hash::make('password'),
-            'role' => 'student',
+            'role' => UserRole::STUDENT,
             'email_verified_at' => now(),
         ]);
 
         // Additional demo users for testing
         User::factory(20)->create([
-            'role' => 'student',
+            'role' => UserRole::STUDENT,
             'email_verified_at' => now(),
         ]);
 
         User::factory(5)->create([
-            'role' => 'teacher',
+            'role' => UserRole::TEACHER,
             'email_verified_at' => now(),
         ]);
 

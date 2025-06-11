@@ -1,196 +1,194 @@
-import React, { useState, useEffect } from 'react';
-import { RefreshCw, Home, AlertTriangle, Clock, Wifi, Server, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
+import React from 'react';
+import { Head, Link } from '@inertiajs/react';
+import GuestLayout from '@/Layouts/GuestLayout';
 
-const Modern500Page = () => {
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [systemStatus, setSystemStatus] = useState([
-    { name: 'Database', status: 'error', icon: Server },
-    { name: 'API Services', status: 'warning', icon: Wifi },
-    { name: 'File Storage', status: 'ok', icon: CheckCircle },
-  ]);
+interface ErrorProps {
+    status: number;
+    message: string;
+    description: string;
+    auth?: {
+        user?: {
+            id: number;
+            name: string;
+            email: string;
+            role: string;
+        } | null;
+    };
+}
 
-  const handleRetry = () => {
-    setIsRetrying(true);
-    setRetryCount(prev => prev + 1);
+export default function Error500({ status, message, description, auth }: ErrorProps) {
+    const user = auth?.user;
     
-    setTimeout(() => {
-      setIsRetrying(false);
-      // Simulate some improvement in system status
-      if (retryCount >= 2) {
-        setSystemStatus(prev => prev.map(service => 
-          service.name === 'API Services' ? { ...service, status: 'ok' } : service
-        ));
-      }
-    }, 3000);
-  };
+    const handleRefresh = () => {
+        window.location.reload();
+    };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'ok': return 'text-green-500';
-      case 'warning': return 'text-yellow-500';
-      case 'error': return 'text-red-500';
-      default: return 'text-gray-500';
-    }
-  };
+    // Role-specific dashboard routes
+    const getDashboardRoute = (role: string) => {
+        switch (role) {
+            case 'admin':
+                return '/admin/dashboard';
+            case 'teacher':
+                return '/teacher/dashboard';
+            case 'student':
+                return '/student/dashboard';
+            default:
+                return '/dashboard';
+        }
+    };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'ok': return CheckCircle;
-      case 'warning': return Clock;
-      case 'error': return XCircle;
-      default: return XCircle;
-    }
-  };
+    const getStatusColor = (status: number) => {
+        if (status === 419) return 'yellow'; // Session expired
+        if (status === 429) return 'orange'; // Rate limited
+        return 'gray'; // Default server error
+    };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-purple-50 relative overflow-hidden">
-      {/* Animated background elements */}
-      <div className="absolute inset-0">
-        {/* Floating orbs */}
-        <div className="absolute top-20 left-1/4 w-32 h-32 bg-purple-200 rounded-full opacity-30 animate-pulse"></div>
-        <div className="absolute top-1/3 right-1/4 w-24 h-24 bg-yellow-200 rounded-full opacity-40 animate-bounce delay-1000"></div>
-        <div className="absolute bottom-1/4 left-1/3 w-40 h-40 bg-purple-100 rounded-full opacity-20 animate-pulse delay-500"></div>
-        
-        {/* Grid pattern */}
-        <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
-      </div>
+    const statusColor = getStatusColor(status);
+    const colorClasses = {
+        gray: {
+            bg: 'from-gray-50 to-blue-50',
+            icon: 'bg-gray-100 text-gray-600',
+            button: 'bg-blue-600 hover:bg-blue-700',
+            text: 'text-gray-700',
+            accent: 'from-gray-500 to-blue-500'
+        },
+        yellow: {
+            bg: 'from-yellow-50 to-orange-50',
+            icon: 'bg-yellow-100 text-yellow-600',
+            button: 'bg-yellow-600 hover:bg-yellow-700',
+            text: 'text-yellow-700',
+            accent: 'from-yellow-500 to-orange-500'
+        },
+        orange: {
+            bg: 'from-orange-50 to-red-50',
+            icon: 'bg-orange-100 text-orange-600',
+            button: 'bg-orange-600 hover:bg-orange-700',
+            text: 'text-orange-700',
+            accent: 'from-orange-500 to-red-500'
+        }
+    };
 
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-6xl w-full">
-          <div className="text-center mb-12">
-            {/* Error illustration */}
-            <div className="relative mb-8">
-              <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-2xl mx-auto border border-gray-100">
-                <div className="relative">
-                  {/* Glitchy 500 effect */}
-                  <div className="relative">
-                    <div className="text-8xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-yellow-500 to-purple-600 animate-pulse">
-                      500
+    const colors = colorClasses[statusColor];
+
+    return (
+        <GuestLayout>
+            <Head title={`${status} - ${message}`} />
+            
+            <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
+                <div className="max-w-md mx-auto text-center px-4">
+                    {/* Server Icon */}
+                    <div className="mb-8">
+                        <div className={`mx-auto w-24 h-24 ${colors.icon} rounded-full flex items-center justify-center mb-6`}>
+                            {status === 419 ? (
+                                <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            ) : status === 429 ? (
+                                <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                </svg>
+                            ) : (
+                                <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                            )}
+                        </div>
+                        <h1 className={`text-6xl font-bold ${colors.text} mb-4`}>
+                            {status}
+                        </h1>
+                        <div className={`w-24 h-1 bg-gradient-to-r ${colors.accent} mx-auto rounded-full`}></div>
                     </div>
-                    <div className="absolute inset-0 text-8xl md:text-9xl font-black text-red-500 opacity-20 transform translate-x-1 translate-y-1">
-                      500
+
+                    {/* Error Message */}
+                    <div className="mb-8">
+                        <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+                            {message}
+                        </h2>
+                        <p className="text-gray-600 leading-relaxed">
+                            {description}
+                        </p>
                     </div>
-                  </div>
-                  
-                  {/* Central server icon */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl p-6 shadow-lg transform rotate-12 hover:rotate-0 transition-transform duration-500">
-                      <Server className="w-12 h-12 text-white" />
+
+                    {/* User Info */}
+                    {user && (
+                        <div className={`mb-6 p-4 ${colors.icon.split(' ')[0]} rounded-lg`}>
+                            <p className={`text-sm ${colors.text}`}>
+                                Logged in as <span className="font-semibold">{user.name}</span> ({user.role})
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="space-y-4">
+                        {status === 419 ? (
+                            // Session expired - refresh page
+                            <button
+                                onClick={handleRefresh}
+                                className={`inline-flex items-center px-6 py-3 ${colors.button} text-white font-semibold rounded-lg transition-colors duration-200 mr-4`}
+                            >
+                                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Refresh Page
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleRefresh}
+                                className={`inline-flex items-center px-6 py-3 ${colors.button} text-white font-semibold rounded-lg transition-colors duration-200 mr-4`}
+                            >
+                                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Try Again
+                            </button>
+                        )}
+                        
+                        {user ? (
+                            <Link
+                                href={getDashboardRoute(user.role)}
+                                className="inline-flex items-center px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition-colors duration-200"
+                            >
+                                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2zm0 0V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                                </svg>
+                                Go to Dashboard
+                            </Link>
+                        ) : (
+                            <Link
+                                href="/"
+                                className="inline-flex items-center px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition-colors duration-200"
+                            >
+                                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                </svg>
+                                Go Home
+                            </Link>
+                        )}
                     </div>
-                  </div>
-                  
-                  {/* Floating warning icons */}
-                  <div className="absolute top-0 right-0 bg-red-500 rounded-full p-2 animate-bounce">
-                    <AlertTriangle className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="absolute bottom-0 left-0 bg-yellow-500 rounded-full p-2 animate-pulse">
-                    <Clock className="w-4 h-4 text-white" />
-                  </div>
+
+                    {/* Technical Details (only in debug mode) */}
+                    {process.env.NODE_ENV === 'development' && status >= 500 && (
+                        <div className="mt-8 p-4 bg-gray-100 rounded-lg text-left">
+                            <h3 className="font-semibold text-gray-800 mb-2">Debug Information:</h3>
+                            <p className="text-xs text-gray-600 font-mono break-words">
+                                {description}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Contact Support */}
+                    <div className={`mt-8 p-4 ${colors.icon.split(' ')[0]} rounded-lg`}>
+                        <p className={`text-sm ${colors.text}`}>
+                            {status === 419 
+                                ? 'Your session expired for security. After refreshing, you\'ll need to log in again.'
+                                : status === 429
+                                ? 'You\'re making requests too quickly. Please wait a moment before trying again.'
+                                : 'If this problem continues, please contact our support team with the error code above.'
+                            }
+                        </p>
+                    </div>
                 </div>
-              </div>
             </div>
-
-            <div className="space-y-6 mb-12">
-              <h1 className="text-4xl md:text-5xl font-bold text-gray-800 leading-tight">
-                Server is Taking a
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-yellow-500">
-                  Study Break
-                </span>
-              </h1>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-                Our servers are having a moment of reflection. Don't worry, your progress is safe and we're working hard to get everything back online!
-              </p>
-            </div>
-          </div>
-
-          {/* System Status */}
-          <div className="bg-white rounded-3xl shadow-xl p-8 mb-8 border border-gray-100">
-            <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center">System Status</h3>
-            <div className="grid md:grid-cols-3 gap-6">
-              {systemStatus.map((service, index) => {
-                const StatusIcon = getStatusIcon(service.status);
-                const ServiceIcon = service.icon;
-                
-                return (
-                  <div key={index} className="bg-gray-50 rounded-2xl p-6 border border-gray-200 hover:shadow-lg transition-shadow">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="bg-purple-100 rounded-full p-3">
-                        <ServiceIcon className="w-6 h-6 text-purple-600" />
-                      </div>
-                      <StatusIcon className={`w-6 h-6 ${getStatusColor(service.status)}`} />
-                    </div>
-                    <h4 className="font-semibold text-gray-800 mb-2">{service.name}</h4>
-                    <div className={`text-sm font-medium capitalize ${getStatusColor(service.status)}`}>
-                      {service.status === 'ok' ? 'Operational' : service.status === 'warning' ? 'Degraded' : 'Down'}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-            <button 
-              onClick={handleRetry}
-              disabled={isRetrying}
-              className="group bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 disabled:from-purple-400 disabled:to-purple-500 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3"
-            >
-              <RefreshCw className={`w-6 h-6 ${isRetrying ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-              <span className="text-lg">
-                {isRetrying ? `Retrying... (${retryCount})` : 'Try Again'}
-              </span>
-            </button>
-            
-            <button className="group bg-yellow-400 hover:bg-yellow-500 text-purple-900 font-bold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3">
-              <Home className="w-6 h-6" />
-              <span className="text-lg">Return Home</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </div>
-
-          {/* Progress indicator */}
-          {isRetrying && (
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200 mb-8">
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                <span className="text-gray-700 font-medium">Attempting to reconnect...</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-gradient-to-r from-purple-600 to-yellow-500 h-2 rounded-full animate-pulse" style={{ width: '70%' }}></div>
-              </div>
-            </div>
-          )}
-
-          {/* Help section */}
-          <div className="bg-gradient-to-r from-purple-100 to-yellow-100 rounded-3xl p-8 text-center border border-purple-200">
-            <h4 className="text-xl font-bold text-gray-800 mb-4">Still Having Issues?</h4>
-            <p className="text-gray-600 mb-6">
-              Our technical team has been notified and is working on a solution. In the meantime, here are some helpful resources:
-            </p>
-            
-            <div className="flex flex-wrap justify-center gap-4">
-              <a href="#" className="inline-flex items-center space-x-2 bg-white hover:bg-gray-50 text-purple-600 font-semibold py-3 px-6 rounded-xl border border-purple-200 hover:border-purple-300 transition-all duration-200">
-                <span>System Status</span>
-                <ArrowRight className="w-4 h-4" />
-              </a>
-              
-              <a href="#" className="inline-flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200">
-                <span>Contact Support</span>
-                <ArrowRight className="w-4 h-4" />
-              </a>
-              
-              <a href="#" className="inline-flex items-center space-x-2 bg-yellow-400 hover:bg-yellow-500 text-purple-900 font-semibold py-3 px-6 rounded-xl transition-all duration-200">
-                <span>Report Issue</span>
-                <ArrowRight className="w-4 h-4" />
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Modern500Page;
+        </GuestLayout>
+    );
+}

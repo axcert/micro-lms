@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Head, useForm, router } from '@inertiajs/react';
 import { ArrowLeft, Users, Calendar, FileText, Save, X } from 'lucide-react';
 
 interface Student {
@@ -9,6 +10,11 @@ interface Student {
 
 interface CreateBatchProps {
   availableStudents?: Student[];
+  errors?: Record<string, string>;
+  flash?: {
+    type: string;
+    message: string;
+  };
 }
 
 interface FormData {
@@ -21,21 +27,11 @@ interface FormData {
   student_ids: number[];
 }
 
-function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
+function CreateBatch({ availableStudents = [], errors: serverErrors = {}, flash }: CreateBatchProps) {
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
-  const [processing, setProcessing] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
   
-  // Demo data if no students provided
-  const demoStudents = availableStudents.length > 0 ? availableStudents : [
-    { id: 1, name: "John Smith", email: "john.smith@example.com" },
-    { id: 2, name: "Sarah Johnson", email: "sarah.johnson@example.com" },
-    { id: 3, name: "Michael Brown", email: "michael.brown@example.com" },
-    { id: 4, name: "Emma Wilson", email: "emma.wilson@example.com" },
-    { id: 5, name: "David Lee", email: "david.lee@example.com" }
-  ];
-  
-  const [data, setData] = useState<FormData>({
+  // ✅ FIXED: Use Inertia's useForm hook for proper form handling
+  const { data, setData, post, processing, errors, reset } = useForm<FormData>({
     name: '',
     description: '',
     start_date: '',
@@ -45,43 +41,30 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
     student_ids: []
   });
 
+  // Update student_ids when selectedStudents changes
   useEffect(() => {
-    setData(prev => ({ ...prev, student_ids: selectedStudents }));
+    setData('student_ids', selectedStudents);
   }, [selectedStudents]);
 
-  const handleSubmit = () => {
-    setProcessing(true);
+  // ✅ FIXED: Real form submission using Inertia
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     
-    // Basic validation
-    const newErrors: Record<string, string> = {};
-    if (!data.name.trim()) newErrors.name = 'Batch name is required';
-    if (!data.start_date) newErrors.start_date = 'Start date is required';
-    if (data.end_date && data.end_date <= data.start_date) {
-      newErrors.end_date = 'End date must be after start date';
-    }
-    if (data.max_students && selectedStudents.length > data.max_students) {
-      newErrors.student_ids = `Cannot assign ${selectedStudents.length} students when maximum is ${data.max_students}`;
-    }
-    
-    setErrors(newErrors);
-    
-    setTimeout(() => {
-      if (Object.keys(newErrors).length === 0) {
-        alert('Batch created successfully! (Demo mode)');
-        // In real app: post('/teacher/batches', { data });
+    post('/teacher/batches', {
+      onSuccess: () => {
+        // Redirect to batches index on success
+        router.visit('/teacher/batches');
+      },
+      onError: (errors) => {
+        console.error('Validation errors:', errors);
       }
-      setProcessing(false);
-    }, 1000);
+    });
   };
 
   const handleCancel = () => {
     if (window.confirm('Are you sure you want to cancel? All unsaved changes will be lost.')) {
-      alert('Would navigate back to batches list (Demo mode)');
+      router.visit('/teacher/batches');
     }
-  };
-
-  const updateData = (field: keyof FormData, value: any) => {
-    setData(prev => ({ ...prev, [field]: value }));
   };
 
   const toggleStudent = (studentId: number) => {
@@ -93,10 +76,10 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
   };
 
   const toggleAllStudents = () => {
-    if (selectedStudents.length === demoStudents.length) {
+    if (selectedStudents.length === availableStudents.length) {
       setSelectedStudents([]);
     } else {
-      setSelectedStudents(demoStudents.map(student => student.id));
+      setSelectedStudents(availableStudents.map(student => student.id));
     }
   };
 
@@ -105,13 +88,15 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Head title="Create New Batch" />
+      
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button 
-                onClick={() => alert('Would navigate back to batches list (Demo mode)')}
+                onClick={() => router.visit('/teacher/batches')}
                 className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
               >
                 <ArrowLeft className="h-4 w-4 mr-1" />
@@ -120,12 +105,28 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
               <div className="h-6 border-l border-gray-300"></div>
               <h1 className="text-xl font-semibold text-gray-900">Create New Batch</h1>
             </div>
-            <div className="text-sm text-gray-500">
-              Micro LMS - Teacher Dashboard
-            </div>
           </div>
         </div>
       </div>
+
+      {/* Flash Messages */}
+      {flash && (
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <div className={`rounded-md p-4 ${
+            flash.type === 'success' ? 'bg-green-50' : 'bg-red-50'
+          }`}>
+            <div className="flex">
+              <div className="ml-3">
+                <p className={`text-sm font-medium ${
+                  flash.type === 'success' ? 'text-green-800' : 'text-red-800'
+                }`}>
+                  {flash.message}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="py-6">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -136,8 +137,8 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
             </p>
           </div>
 
-          {/* Form */}
-          <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-lg">
+          {/* ✅ FIXED: Proper form with onSubmit handler */}
+          <form onSubmit={handleSubmit} className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-lg">
             <div className="space-y-6 p-6">
               {/* Basic Information */}
               <div>
@@ -156,7 +157,7 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
                       type="text"
                       id="name"
                       value={data.name}
-                      onChange={(e) => updateData('name', e.target.value)}
+                      onChange={(e) => setData('name', e.target.value)}
                       className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${
                         errors.name ? 'border-red-300' : 'border-gray-300'
                       }`}
@@ -177,7 +178,7 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
                       id="description"
                       rows={3}
                       value={data.description}
-                      onChange={(e) => updateData('description', e.target.value)}
+                      onChange={(e) => setData('description', e.target.value)}
                       className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${
                         errors.description ? 'border-red-300' : 'border-gray-300'
                       }`}
@@ -194,7 +195,7 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
                       <input
                         type="checkbox"
                         checked={data.is_active}
-                        onChange={(e) => updateData('is_active', e.target.checked)}
+                        onChange={(e) => setData('is_active', e.target.checked)}
                         className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                       />
                       <span className="ml-2 text-sm text-gray-700">
@@ -225,7 +226,7 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
                       type="date"
                       id="start_date"
                       value={data.start_date}
-                      onChange={(e) => updateData('start_date', e.target.value)}
+                      onChange={(e) => setData('start_date', e.target.value)}
                       min={today}
                       className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${
                         errors.start_date ? 'border-red-300' : 'border-gray-300'
@@ -246,7 +247,7 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
                       type="date"
                       id="end_date"
                       value={data.end_date}
-                      onChange={(e) => updateData('end_date', e.target.value)}
+                      onChange={(e) => setData('end_date', e.target.value)}
                       min={data.start_date || today}
                       className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${
                         errors.end_date ? 'border-red-300' : 'border-gray-300'
@@ -266,7 +267,7 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
                       type="number"
                       id="max_students"
                       value={data.max_students}
-                      onChange={(e) => updateData('max_students', e.target.value ? parseInt(e.target.value) : '')}
+                      onChange={(e) => setData('max_students', e.target.value ? parseInt(e.target.value) : '')}
                       min="1"
                       max="100"
                       className={`mt-1 block w-full md:w-48 border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm ${
@@ -302,7 +303,7 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
                         onClick={toggleAllStudents}
                         className="text-sm text-green-600 hover:text-green-700 font-medium"
                       >
-                        {selectedStudents.length === demoStudents.length ? 'Deselect All' : 'Select All'}
+                        {selectedStudents.length === availableStudents.length ? 'Deselect All' : 'Select All'}
                       </button>
                       <span className="text-sm text-gray-500">
                         ({selectedStudents.length} selected)
@@ -311,12 +312,12 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
                   </div>
                   
                   <div className="border border-gray-200 rounded-md max-h-60 overflow-y-auto">
-                    {demoStudents.length === 0 ? (
+                    {availableStudents.length === 0 ? (
                       <div className="p-4 text-center text-gray-500">
                         No available students to assign
                       </div>
                     ) : (
-                      demoStudents.map((student) => {
+                      availableStudents.map((student) => {
                         const isSelected = selectedStudents.includes(student.id);
                         
                         return (
@@ -378,8 +379,7 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
                     Cancel
                   </button>
                   <button
-                    type="button"
-                    onClick={handleSubmit}
+                    type="submit"
                     disabled={processing}
                     className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ${
                       processing ? 'opacity-50 cursor-not-allowed' : ''
@@ -391,14 +391,11 @@ function CreateBatch({ availableStudents = [] }: CreateBatchProps) {
                 </div>
               </div>
             </div>
-          </div>
+          </form>
         </div>
       </div>
     </div>
   );
 }
 
-// Demo wrapper for artifact environment
-export default function App() {
-  return <CreateBatch />;
-}
+export default CreateBatch;

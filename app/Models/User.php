@@ -2,94 +2,230 @@
 
 namespace App\Models;
 
+use App\Enums\UserRole;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+// REMOVED: use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Facades\Log;
+use Exception;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
+    // REMOVED HasApiTokens from the use statement
     use HasFactory, Notifiable;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'password',
         'role',
-        'phone',
+        'email_verified_at',
+        'is_active',
     ];
 
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var array<int, string>
+     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    protected function casts(): array
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+        'role' => UserRole::class,
+        'is_active' => 'boolean',
+    ];
+
+    /**
+     * Handle role setting properly
+     */
+    public function setRoleAttribute($value)
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        if ($value instanceof UserRole) {
+            $this->attributes['role'] = $value->value;
+        } else {
+            $this->attributes['role'] = $value;
+        }
     }
 
     /**
-     * Get batches where this user is a teacher
+     * Handle role getting properly
      */
-    public function teachingBatches(): HasMany
+    public function getRoleAttribute($value)
+    {
+        try {
+            return UserRole::from($value);
+        } catch (Exception $e) {
+            Log::warning('Invalid role value in database', [
+                'role' => $value, 
+                'user_id' => $this->id ?? 'unknown'
+            ]);
+            return UserRole::STUDENT; // Default fallback
+        }
+    }
+
+    /**
+     * Get the user's role display name
+     */
+    public function getRoleDisplayNameAttribute(): string
+    {
+        try {
+            return $this->role->getDisplayName();
+        } catch (Exception $e) {
+            return 'Student'; // Fallback
+        }
+    }
+
+    /**
+     * Check if user has a specific role
+     */
+    public function hasRole(UserRole $role): bool
+    {
+        try {
+            return $this->role === $role;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Check if user can perform a specific action
+     */
+    public function can($ability, $arguments = []): bool
+    {
+        if (is_string($ability)) {
+            try {
+                return $this->role->can($ability);
+            } catch (Exception $e) {
+                return false;
+            }
+        }
+        
+        return parent::can($ability, $arguments);
+    }
+
+    /**
+     * Check if user is active
+     */
+    public function isActive(): bool
+    {
+        return $this->is_active;
+    }
+
+    /**
+     * Activate user
+     */
+    public function activate(): bool
+    {
+        return $this->update(['is_active' => true]);
+    }
+
+    /**
+     * Deactivate user
+     */
+    public function deactivate(): bool
+    {
+        return $this->update(['is_active' => false]);
+    }
+
+    /**
+     * Scope for active users
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope for inactive users
+     */
+    public function scopeInactive($query)
+    {
+        return $query->where('is_active', false);
+    }
+
+    /**
+     * Scope for users by role
+     */
+    public function scopeByRole($query, UserRole|string $role)
+    {
+        $roleValue = $role instanceof UserRole ? $role->value : $role;
+        return $query->where('role', $roleValue);
+    }
+
+    /**
+     * Scope for students
+     */
+    public function scopeStudents($query)
+    {
+        return $query->where('role', UserRole::STUDENT->value);
+    }
+
+    /**
+     * Scope for teachers
+     */
+    public function scopeTeachers($query)
+    {
+        return $query->where('role', UserRole::TEACHER->value);
+    }
+
+    /**
+     * Scope for admins
+     */
+    public function scopeAdmins($query)
+    {
+        return $query->where('role', UserRole::ADMIN->value);
+    }
+
+    /**
+     * Relationships
+     */
+
+    /**
+     * Batches created by this user (if teacher)
+     */
+    public function createdBatches(): HasMany
     {
         return $this->hasMany(Batch::class, 'teacher_id');
     }
 
     /**
-     * Get batches where this user is a student
-     * Using the corrected foreign key 'student_id'
+     * Batches this user belongs to (if student)
      */
-    public function studentBatches(): BelongsToMany
+    public function batches(): BelongsToMany
     {
-        return $this->belongsToMany(
-            Batch::class,
-            'batch_students',    // Pivot table
-            'student_id',        // Foreign key for this model (User) in pivot table
-            'batch_id'           // Foreign key for related model (Batch) in pivot table
-        )->withTimestamps();
+        return $this->belongsToMany(Batch::class, 'batch_students', 'student_id', 'batch_id');
     }
 
     /**
-     * Get batch enrollments for this student
+     * Classes created by this user (if teacher)
      */
-    public function batchEnrollments(): HasMany
+    public function createdClasses(): HasMany
     {
-        return $this->hasMany(BatchStudent::class, 'student_id');
-    }
-
-    // ========== QUIZ-RELATED RELATIONSHIPS USING YOUR ACTUAL SCHEMA ==========
-
-    /**
-     * Get quiz attempts made by this user
-     * Using 'student_id' based on your actual database schema
-     */
-    public function quizAttempts(): HasMany
-    {
-        return $this->hasMany(QuizAttempt::class, 'student_id'); // Use student_id
+        return $this->hasMany(ClassModel::class, 'teacher_id');
     }
 
     /**
-     * Get quizzes this user has attempted using your actual schema
-     */
-    public function attemptedQuizzes(): BelongsToMany
-    {
-        return $this->belongsToMany(
-            Quiz::class, 
-            'quiz_attempts',    // pivot table name
-            'student_id',       // foreign key for this model (User) in pivot table - use student_id
-            'quiz_id'           // foreign key for related model (Quiz) in pivot table
-        )->withPivot(['total_score', 'max_score', 'status', 'submitted_at'])
-         ->withTimestamps();
-    }
-
-    /**
-     * Get quizzes created by this teacher
+     * Quizzes created by this user (if teacher)
      */
     public function createdQuizzes(): HasMany
     {
@@ -97,90 +233,51 @@ class User extends Authenticatable
     }
 
     /**
-     * Get completed quiz attempts using your actual schema
+     * Quiz attempts by this user (if student)
      */
-    public function completedQuizAttempts()
+    public function quizAttempts(): HasMany
     {
-        return $this->quizAttempts()
-                    ->whereIn('status', ['submitted', 'completed']); // Use status
+        return $this->hasMany(QuizAttempt::class, 'student_id');
     }
 
     /**
-     * Get in-progress quiz attempts using your actual schema
+     * Attendance records for this user (if student)
      */
-    public function inProgressQuizAttempts()
+    public function attendanceRecords(): HasMany
     {
-        return $this->quizAttempts()
-                    ->whereIn('status', ['started', 'in_progress']); // Use status
+        return $this->hasMany(Attendance::class, 'student_id');
     }
 
     /**
-     * Get pending quizzes for this student using your actual schema
+     * Activity logs for this user
      */
-    public function pendingQuizzes()
+    public function activityLogs(): HasMany
     {
-        return Quiz::whereHas('batch.students', function ($query) {
-                $query->where('batch_students.student_id', $this->id); // batch_students uses student_id
-            })
-            ->where('end_time', '>=', now())
-            ->whereDoesntHave('attempts', function ($query) {
-                $query->where('student_id', $this->id) // quiz_attempts uses student_id
-                      ->whereIn('status', ['submitted', 'completed']); // Use status
-            });
+        return $this->hasMany(ActivityLog::class);
     }
 
     /**
-     * Get available quizzes for this student (through their batches)
+     * Notifications for this user
      */
-    public function availableQuizzes()
+    public function userNotifications(): HasMany
     {
-        return Quiz::whereHas('batch.students', function ($query) {
-                $query->where('batch_students.student_id', $this->id); // batch_students uses student_id
-            });
+        return $this->hasMany(Notification::class);
     }
 
     /**
-     * Get student statistics for dashboard using your actual schema
+     * Helper methods
      */
-    public function getStudentStats()
-    {
-        if (!$this->isStudent()) {
-            return [
-                'averageScore' => 0,
-                'quizzesCompleted' => 0,
-                'attendance' => 0,
-            ];
-        }
-
-        $completedAttempts = $this->quizAttempts()
-                                 ->whereIn('status', ['submitted', 'completed']) // Use status
-                                 ->whereNotNull('total_score')
-                                 ->whereNotNull('max_score')
-                                 ->where('max_score', '>', 0);
-
-        // Calculate average percentage score using your actual column names
-        $averageScore = 0;
-        if ($completedAttempts->count() > 0) {
-            $averageScore = $completedAttempts->get()->avg(function ($attempt) {
-                return ($attempt->total_score / $attempt->max_score) * 100;
-            });
-        }
-
-        return [
-            'averageScore' => round($averageScore, 1),
-            'quizzesCompleted' => $completedAttempts->count(),
-            'attendance' => 85, // This would need to be calculated based on your attendance system
-        ];
-    }
-
-    // ========== EXISTING ROLE METHODS ==========
 
     /**
      * Check if user is admin
      */
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        try {
+            return $this->role === UserRole::ADMIN;
+        } catch (Exception $e) {
+            return false;
+        }
     }
 
     /**
@@ -188,7 +285,11 @@ class User extends Authenticatable
      */
     public function isTeacher(): bool
     {
-        return $this->role === 'teacher';
+        try {
+            return $this->role === UserRole::TEACHER;
+        } catch (Exception $e) {
+            return false;
+        }
     }
 
     /**
@@ -196,6 +297,35 @@ class User extends Authenticatable
      */
     public function isStudent(): bool
     {
-        return $this->role === 'student';
+        try {
+            return $this->role === UserRole::STUDENT;
+        } catch (Exception $e) {
+            return true; // Default to student
+        }
+    }
+
+    /**
+     * Get user's full name
+     */
+    public function getFullNameAttribute(): string
+    {
+        return $this->name;
+    }
+
+    /**
+     * Get user's initials
+     */
+    public function getInitialsAttribute(): string
+    {
+        $names = explode(' ', $this->name);
+        $initials = '';
+        
+        foreach ($names as $name) {
+            if (!empty($name)) {
+                $initials .= strtoupper(substr($name, 0, 1));
+            }
+        }
+        
+        return substr($initials, 0, 2); // Max 2 initials
     }
 }

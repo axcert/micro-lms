@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Head, router } from '@inertiajs/react';
 import { 
   ArrowLeft, 
   Users, 
@@ -19,9 +20,7 @@ interface Student {
   id: number;
   name: string;
   email: string;
-  pivot?: {
-    enrolled_at: string;
-  };
+  enrolled_at?: string;
 }
 
 interface Class {
@@ -49,7 +48,7 @@ interface Batch {
   end_date: string | null;
   max_students: number | null;
   is_active: boolean;
-  student_count: number;
+  students_count?: number;
   students: Student[];
   teacher: {
     id: number;
@@ -57,110 +56,64 @@ interface Batch {
   };
 }
 
-// Sample data for demonstration
-const sampleBatch: Batch = {
-  id: 1,
-  name: "Mathematics Grade 10 - Morning",
-  description: "Advanced mathematics course for Grade 10 students focusing on algebra and geometry",
-  start_date: "2025-02-01",
-  end_date: "2025-06-30",
-  max_students: 30,
-  is_active: true,
-  student_count: 25,
-  teacher: {
-    id: 1,
-    name: "Dr. Sarah Wilson"
-  },
-  students: [
-    {
-      id: 1,
-      name: "John Smith",
-      email: "john.smith@example.com",
-      pivot: { enrolled_at: "2025-01-15" }
-    },
-    {
-      id: 2,
-      name: "Sarah Johnson",
-      email: "sarah.johnson@example.com",
-      pivot: { enrolled_at: "2025-01-16" }
-    },
-    {
-      id: 3,
-      name: "Michael Brown",
-      email: "michael.brown@example.com",
-      pivot: { enrolled_at: "2025-01-17" }
-    },
-    {
-      id: 4,
-      name: "Emma Wilson",
-      email: "emma.wilson@example.com",
-      pivot: { enrolled_at: "2025-01-18" }
-    },
-    {
-      id: 5,
-      name: "David Lee",
-      email: "david.lee@example.com",
-      pivot: { enrolled_at: "2025-01-19" }
-    }
-  ]
-};
+interface BatchShowProps {
+  batch: Batch;
+  recentClasses?: Class[];
+  recentQuizzes?: Quiz[];
+  stats: {
+    students_count: number;
+    classes_count: number;
+    quizzes_count: number;
+  };
+  flash?: {
+    type: string;
+    message: string;
+  };
+}
 
-const sampleClasses: Class[] = [
-  {
-    id: 1,
-    title: "Introduction to Quadratic Equations",
-    scheduled_at: "2025-06-05T10:00:00Z",
-    zoom_link: "https://zoom.us/j/123456789",
-    status: "scheduled"
-  },
-  {
-    id: 2,
-    title: "Solving Linear Systems",
-    scheduled_at: "2025-06-03T10:00:00Z",
-    zoom_link: "https://zoom.us/j/987654321",
-    status: "completed"
-  },
-  {
-    id: 3,
-    title: "Geometry Fundamentals",
-    scheduled_at: "2025-06-07T10:00:00Z",
-    zoom_link: null,
-    status: "scheduled"
-  }
-];
-
-const sampleQuizzes: Quiz[] = [
-  {
-    id: 1,
-    title: "Algebra Basics Quiz",
-    questions_count: 15,
-    attempts_count: 23,
-    created_at: "2025-05-28T00:00:00Z",
-    status: "active"
-  },
-  {
-    id: 2,
-    title: "Quadratic Equations Test",
-    questions_count: 20,
-    attempts_count: 18,
-    created_at: "2025-05-25T00:00:00Z",
-    status: "active"
-  },
-  {
-    id: 3,
-    title: "Geometry Practice",
-    questions_count: 12,
-    attempts_count: 0,
-    created_at: "2025-06-02T00:00:00Z",
-    status: "draft"
-  }
-];
-
-export default function BatchShow() {
+export default function BatchShow({ 
+  batch, 
+  recentClasses = [], 
+  recentQuizzes = [], 
+  stats,
+  flash 
+}: BatchShowProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'activity'>('overview');
-  const [batch] = useState<Batch>(sampleBatch);
-  const [classes] = useState<Class[]>(sampleClasses);
-  const [quizzes] = useState<Quiz[]>(sampleQuizzes);
+
+  // ✅ FIXED: Real navigation functions
+  const handleEdit = () => {
+    router.visit(`/teacher/batches/${batch.id}/edit`);
+  };
+
+  const handleBackToBatches = () => {
+    router.visit('/teacher/batches');
+  };
+
+  const handleScheduleClass = () => {
+    router.visit('/teacher/classes/create', {
+      data: { batch_id: batch.id }
+    });
+  };
+
+  const handleCreateQuiz = () => {
+    router.visit('/teacher/quizzes/create', {
+      data: { batch_id: batch.id }
+    });
+  };
+
+  const handleRemoveStudent = (studentId: number, studentName: string) => {
+    if (confirm(`Are you sure you want to remove ${studentName} from this batch?`)) {
+      router.delete(`/teacher/batches/${batch.id}/students/${studentId}`, {
+        onSuccess: () => {
+          // Page will reload with updated data
+        }
+      });
+    }
+  };
+
+  const handleManageStudents = () => {
+    router.visit(`/teacher/batches/${batch.id}/edit`);
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -178,12 +131,6 @@ export default function BatchShow() {
       hour: '2-digit',
       minute: '2-digit',
     });
-  };
-
-  const handleRemoveStudent = (studentId: number, studentName: string) => {
-    if (confirm(`Are you sure you want to remove ${studentName} from this batch?`)) {
-      alert(`${studentName} would be removed from the batch (demo mode)`);
-    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -207,24 +154,45 @@ export default function BatchShow() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Head title={`${batch.name} - Batch Details`} />
+      
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <button className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700">
+              <button 
+                onClick={handleBackToBatches}
+                className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
+              >
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 Back to Batches
               </button>
               <div className="h-6 border-l border-gray-300"></div>
               <h1 className="text-xl font-semibold text-gray-900">Batch Details</h1>
             </div>
-            <div className="text-sm text-gray-500">
-              Micro LMS - Teacher Dashboard
-            </div>
           </div>
         </div>
       </div>
+
+      {/* Flash Messages */}
+      {flash && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <div className={`rounded-md p-4 ${
+            flash.type === 'success' ? 'bg-green-50' : 'bg-red-50'
+          }`}>
+            <div className="flex">
+              <div className="ml-3">
+                <p className={`text-sm font-medium ${
+                  flash.type === 'success' ? 'text-green-800' : 'text-red-800'
+                }`}>
+                  {flash.message}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -249,21 +217,21 @@ export default function BatchShow() {
               
               <div className="flex space-x-3">
                 <button
-                  onClick={() => alert('Schedule Class feature (demo mode)')}
+                  onClick={handleScheduleClass}
                   className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   <Video className="h-4 w-4 mr-2" />
                   Schedule Class
                 </button>
                 <button
-                  onClick={() => alert('Create Quiz feature (demo mode)')}
+                  onClick={handleCreateQuiz}
                   className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                 >
                   <FileQuestion className="h-4 w-4 mr-2" />
                   Create Quiz
                 </button>
                 <button
-                  onClick={() => alert('Edit Batch feature (demo mode)')}
+                  onClick={handleEdit}
                   className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                 >
                   <Edit className="h-4 w-4 mr-2" />
@@ -283,7 +251,7 @@ export default function BatchShow() {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500">Students</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {batch.student_count}
+                    {stats.students_count}
                     {batch.max_students && (
                       <span className="text-sm text-gray-500 font-normal">
                         /{batch.max_students}
@@ -302,7 +270,7 @@ export default function BatchShow() {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500">Classes</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {classes.length}
+                    {stats.classes_count}
                   </p>
                 </div>
               </div>
@@ -316,7 +284,7 @@ export default function BatchShow() {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500">Quizzes</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {quizzes.length}
+                    {stats.quizzes_count}
                   </p>
                 </div>
               </div>
@@ -364,7 +332,7 @@ export default function BatchShow() {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                Students ({batch.student_count})
+                Students ({stats.students_count})
               </button>
               <button
                 onClick={() => setActiveTab('activity')}
@@ -423,7 +391,7 @@ export default function BatchShow() {
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
                   <div className="space-y-3">
                     <button
-                      onClick={() => alert('Schedule Class feature (demo mode)')}
+                      onClick={handleScheduleClass}
                       className="flex items-center w-full p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors text-left"
                     >
                       <Video className="h-5 w-5 text-blue-600 mr-3" />
@@ -434,7 +402,7 @@ export default function BatchShow() {
                     </button>
                     
                     <button
-                      onClick={() => alert('Create Quiz feature (demo mode)')}
+                      onClick={handleCreateQuiz}
                       className="flex items-center w-full p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors text-left"
                     >
                       <FileQuestion className="h-5 w-5 text-yellow-600 mr-3" />
@@ -445,7 +413,7 @@ export default function BatchShow() {
                     </button>
                     
                     <button
-                      onClick={() => alert('Edit Batch feature (demo mode)')}
+                      onClick={handleEdit}
                       className="flex items-center w-full p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors text-left"
                     >
                       <Settings className="h-5 w-5 text-gray-600 mr-3" />
@@ -464,10 +432,10 @@ export default function BatchShow() {
                 <div className="px-6 py-4 border-b border-gray-200">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-medium text-gray-900">
-                      Students ({batch.student_count})
+                      Students ({stats.students_count})
                     </h3>
                     <button
-                      onClick={() => alert('Manage Students feature (demo mode)')}
+                      onClick={handleManageStudents}
                       className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                     >
                       Manage Students
@@ -484,7 +452,7 @@ export default function BatchShow() {
                     </p>
                     <div className="mt-6">
                       <button
-                        onClick={() => alert('Add Students feature (demo mode)')}
+                        onClick={handleManageStudents}
                         className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                       >
                         Add Students
@@ -510,9 +478,9 @@ export default function BatchShow() {
                         </div>
                         
                         <div className="flex items-center space-x-4">
-                          {student.pivot?.enrolled_at && (
+                          {student.enrolled_at && (
                             <span className="text-xs text-gray-500">
-                              Enrolled {formatDate(student.pivot.enrolled_at)}
+                              Enrolled {formatDate(student.enrolled_at)}
                             </span>
                           )}
                           <button
@@ -537,24 +505,24 @@ export default function BatchShow() {
                     <h3 className="text-lg font-medium text-gray-900">Recent Classes</h3>
                   </div>
                   
-                  {classes.length === 0 ? (
+                  {recentClasses.length === 0 ? (
                     <div className="text-center py-8">
                       <Video className="mx-auto h-8 w-8 text-gray-400" />
                       <p className="mt-2 text-sm text-gray-500">No classes scheduled yet</p>
                     </div>
                   ) : (
                     <div className="divide-y divide-gray-200">
-                      {classes.map((class_item) => (
-                        <div key={class_item.id} className="px-6 py-4">
+                      {recentClasses.map((classItem) => (
+                        <div key={classItem.id} className="px-6 py-4">
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="text-sm font-medium text-gray-900">{class_item.title}</p>
+                              <p className="text-sm font-medium text-gray-900">{classItem.title}</p>
                               <p className="text-xs text-gray-500">
-                                {formatDateTime(class_item.scheduled_at)}
+                                {formatDateTime(classItem.scheduled_at)}
                               </p>
                             </div>
-                            <span className={getStatusBadge(class_item.status)}>
-                              {class_item.status}
+                            <span className={getStatusBadge(classItem.status)}>
+                              {classItem.status}
                             </span>
                           </div>
                         </div>
@@ -569,14 +537,14 @@ export default function BatchShow() {
                     <h3 className="text-lg font-medium text-gray-900">Recent Quizzes</h3>
                   </div>
                   
-                  {quizzes.length === 0 ? (
+                  {recentQuizzes.length === 0 ? (
                     <div className="text-center py-8">
                       <FileQuestion className="mx-auto h-8 w-8 text-gray-400" />
                       <p className="mt-2 text-sm text-gray-500">No quizzes created yet</p>
                     </div>
                   ) : (
                     <div className="divide-y divide-gray-200">
-                      {quizzes.map((quiz) => (
+                      {recentQuizzes.map((quiz) => (
                         <div key={quiz.id} className="px-6 py-4">
                           <div className="flex items-center justify-between">
                             <div>

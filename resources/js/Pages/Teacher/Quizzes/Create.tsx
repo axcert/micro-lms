@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Head, router } from '@inertiajs/react';
 import { 
   ArrowLeft, 
   FileQuestion, 
@@ -6,26 +7,37 @@ import {
   Clock, 
   Users,
   Settings,
+  Plus,
+  Save,
+  AlertTriangle,
   BookOpen,
   Bell,
-  LogOut,
-  Shield,
-  Eye,
-  Shuffle
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 
 interface Batch {
   id: number;
   name: string;
   student_count: number;
+  students: Array<{
+    id: number;
+    name: string;
+    email: string;
+  }>;
 }
 
-interface FormData {
+interface CreateQuizProps {
+  batches: Batch[];
+  errors?: Record<string, string>;
+  old?: Record<string, any>;
+}
+
+interface QuizFormData {
   title: string;
   description: string;
   instructions: string;
   batch_id: string;
-  total_marks: number | '';
   pass_marks: number | '';
   duration_minutes: number | '';
   start_time: string;
@@ -40,81 +52,84 @@ interface FormData {
   prevent_copy_paste: boolean;
 }
 
-export default function CreateQuiz() {
-  const [formData, setFormData] = useState<FormData>({
-    title: '',
-    description: '',
-    instructions: '',
-    batch_id: '',
-    total_marks: '',
-    pass_marks: '',
-    duration_minutes: 60,
-    start_time: '',
-    end_time: '',
-    max_attempts: 1,
-    shuffle_questions: false,
-    shuffle_options: false,
-    show_results_immediately: true,
-    allow_review: true,
-    auto_submit: true,
-    require_webcam: false,
-    prevent_copy_paste: false
+export default function CreateQuiz({ batches, errors = {}, old = {} }: CreateQuizProps) {
+  const [formData, setFormData] = useState<QuizFormData>({
+    title: old.title || '',
+    description: old.description || '',
+    instructions: old.instructions || '',
+    batch_id: old.batch_id || '',
+    pass_marks: old.pass_marks || '',
+    duration_minutes: old.duration_minutes || '',
+    start_time: old.start_time || '',
+    end_time: old.end_time || '',
+    max_attempts: old.max_attempts || '',
+    shuffle_questions: old.shuffle_questions ?? true,
+    shuffle_options: old.shuffle_options ?? true,
+    show_results_immediately: old.show_results_immediately ?? true,
+    allow_review: old.allow_review ?? true,
+    auto_submit: old.auto_submit ?? true,
+    require_webcam: old.require_webcam ?? false,
+    prevent_copy_paste: old.prevent_copy_paste ?? true
   });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [processing, setProcessing] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+  const [activeTab, setActiveTab] = useState<'details' | 'settings'>('details');
 
-  // Mock data
-  const mockBatches: Batch[] = [
-    { id: 1, name: "Mathematics Grade 10 - Morning", student_count: 28 },
-    { id: 2, name: "Physics Grade 11 - Afternoon", student_count: 25 },
-    { id: 3, name: "Chemistry Grade 12 - Evening", student_count: 20 },
-    { id: 4, name: "Biology Grade 9 - Morning", student_count: 22 }
-  ];
+  useEffect(() => {
+    if (formData.batch_id) {
+      const batch = batches.find(b => b.id.toString() === formData.batch_id);
+      setSelectedBatch(batch || null);
+    }
+  }, [formData.batch_id, batches]);
 
-  const selectedBatch = mockBatches.find(batch => batch.id.toString() === formData.batch_id);
-
-  const handleSubmit = () => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     setProcessing(true);
-    
-    // Simulate validation
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.title.trim()) {
-      newErrors.title = 'Quiz title is required.';
-    }
-    
-    if (!formData.batch_id) {
-      newErrors.batch_id = 'Please select a batch for this quiz.';
-    }
-    
-    if (formData.pass_marks && formData.total_marks && formData.pass_marks > formData.total_marks) {
-      newErrors.pass_marks = 'Pass marks cannot be greater than total marks.';
-    }
-    
-    if (formData.start_time && formData.end_time && new Date(formData.start_time) >= new Date(formData.end_time)) {
-      newErrors.end_time = 'End time must be after start time.';
-    }
-    
-    setErrors(newErrors);
-    
-    setTimeout(() => {
-      setProcessing(false);
-      if (Object.keys(newErrors).length === 0) {
-        alert('Quiz created successfully! Add questions to complete your quiz.');
-      }
-    }, 1000);
+
+    const submitData = {
+      ...formData,
+      pass_marks: formData.pass_marks === '' ? 0 : Number(formData.pass_marks),
+      duration_minutes: formData.duration_minutes === '' ? null : Number(formData.duration_minutes),
+      max_attempts: formData.max_attempts === '' ? null : Number(formData.max_attempts),
+      start_time: formData.start_time || null,
+      end_time: formData.end_time || null
+    };
+
+    router.post('/teacher/quizzes', submitData, {
+      onFinish: () => setProcessing(false),
+      onError: () => setProcessing(false)
+    });
   };
 
-  const getTomorrowDate = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
-    return tomorrow.toISOString().slice(0, 16);
+  const handleInputChange = (field: keyof QuizFormData, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const goBack = () => {
+    router.visit('/teacher/quizzes');
+  };
+
+  const getMinStartTime = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 30); // Minimum 30 minutes from now
+    return now.toISOString().slice(0, 16);
+  };
+
+  const getMinEndTime = () => {
+    if (!formData.start_time) return '';
+    const startTime = new Date(formData.start_time);
+    startTime.setHours(startTime.getHours() + 1); // Minimum 1 hour after start
+    return startTime.toISOString().slice(0, 16);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Head title="Create Quiz" />
+      
       {/* Navigation Header */}
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -146,25 +161,26 @@ export default function CreateQuiz() {
         </div>
       </nav>
 
-      {/* Sidebar */}
+      {/* Main Content */}
       <div className="flex">
+        {/* Sidebar */}
         <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 md:pt-16">
           <div className="flex-1 flex flex-col min-h-0 bg-white border-r border-gray-200">
             <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
               <nav className="mt-5 flex-1 px-2 space-y-1">
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <a href="/teacher/batches" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
                   <BookOpen className="text-gray-400 mr-3 h-5 w-5" />
                   Batches
                 </a>
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <a href="/teacher/classes" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
                   <FileQuestion className="text-gray-400 mr-3 h-5 w-5" />
                   Classes
                 </a>
-                <a href="#" className="bg-purple-100 text-purple-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <a href="/teacher/quizzes" className="bg-purple-100 text-purple-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
                   <FileQuestion className="text-purple-500 mr-3 h-5 w-5" />
                   Quizzes
                 </a>
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <a href="/teacher/students" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
                   <Users className="text-gray-400 mr-3 h-5 w-5" />
                   Students
                 </a>
@@ -173,7 +189,7 @@ export default function CreateQuiz() {
           </div>
         </div>
 
-        {/* Main Content */}
+        {/* Content Area */}
         <div className="md:pl-64 flex flex-col flex-1">
           <main className="flex-1">
             <div className="py-6">
@@ -183,397 +199,397 @@ export default function CreateQuiz() {
                   <div className="flex items-center space-x-3">
                     <button
                       type="button"
+                      onClick={goBack}
                       className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
                     >
                       <ArrowLeft className="h-4 w-4 mr-1" />
                       Back to Quizzes
                     </button>
                   </div>
-                  <h1 className="mt-2 text-2xl font-bold text-gray-900">Create New Quiz</h1>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Create an assessment for your students with questions and scoring
-                  </p>
+                  <div className="mt-2">
+                    <h1 className="text-2xl font-bold text-gray-900">Create New Quiz</h1>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Set up a new assessment for your students
+                    </p>
+                  </div>
                 </div>
 
-                {/* Form */}
-                <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-lg">
-                  <div className="space-y-6 p-6">
-                    {/* Basic Information */}
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                        <FileQuestion className="h-5 w-5 mr-2 text-purple-600" />
-                        Quiz Information
-                      </h3>
-                      
-                      <div className="grid grid-cols-1 gap-6">
-                        {/* Quiz Title */}
-                        <div>
-                          <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                            Quiz Title *
-                          </label>
-                          <input
-                            type="text"
-                            id="title"
-                            value={formData.title}
-                            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                            className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                              errors.title ? 'border-red-300' : 'border-gray-300'
-                            }`}
-                            placeholder="e.g., Quadratic Equations Assessment"
-                            required
-                          />
-                          {errors.title && (
-                            <p className="mt-1 text-sm text-red-600">{errors.title}</p>
-                          )}
-                        </div>
-
-                        {/* Description */}
-                        <div>
-                          <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                            Description
-                          </label>
-                          <textarea
-                            id="description"
-                            rows={3}
-                            value={formData.description}
-                            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                            placeholder="Brief description of what this quiz covers..."
-                          />
-                        </div>
-
-                        {/* Instructions */}
-                        <div>
-                          <label htmlFor="instructions" className="block text-sm font-medium text-gray-700">
-                            Instructions for Students
-                          </label>
-                          <textarea
-                            id="instructions"
-                            rows={4}
-                            value={formData.instructions}
-                            onChange={(e) => setFormData(prev => ({ ...prev, instructions: e.target.value }))}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                            placeholder="Instructions that students will see before starting the quiz..."
-                          />
-                        </div>
-
-                        {/* Batch Selection */}
-                        <div>
-                          <label htmlFor="batch_id" className="block text-sm font-medium text-gray-700">
-                            Select Batch *
-                          </label>
-                          <select
-                            id="batch_id"
-                            value={formData.batch_id}
-                            onChange={(e) => setFormData(prev => ({ ...prev, batch_id: e.target.value }))}
-                            className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                              errors.batch_id ? 'border-red-300' : 'border-gray-300'
-                            }`}
-                            required
-                          >
-                            <option value="">Choose a batch...</option>
-                            {mockBatches.map(batch => (
-                              <option key={batch.id} value={batch.id.toString()}>
-                                {batch.name} ({batch.student_count} students)
-                              </option>
+                {/* Error Messages */}
+                {Object.keys(errors).length > 0 && (
+                  <div className="mb-6 rounded-md bg-red-50 p-4">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <XCircle className="h-5 w-5 text-red-400" />
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-red-800">
+                          Please correct the following errors:
+                        </h3>
+                        <div className="mt-2 text-sm text-red-700">
+                          <ul className="list-disc pl-5 space-y-1">
+                            {Object.entries(errors).map(([field, message]) => (
+                              <li key={field}>{message}</li>
                             ))}
-                          </select>
-                          {errors.batch_id && (
-                            <p className="mt-1 text-sm text-red-600">{errors.batch_id}</p>
-                          )}
-                          
-                          {selectedBatch && (
-                            <div className="mt-2 p-3 bg-purple-50 rounded-md">
-                              <p className="text-sm text-purple-700">
-                                <Users className="inline h-4 w-4 mr-1" />
-                                {selectedBatch.student_count} students will have access to this quiz
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmit}>
+                  {/* Tabs */}
+                  <div className="border-b border-gray-200 mb-6">
+                    <nav className="-mb-px flex space-x-8">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('details')}
+                        className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                          activeTab === 'details'
+                            ? 'border-purple-500 text-purple-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        Quiz Details
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('settings')}
+                        className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                          activeTab === 'settings'
+                            ? 'border-purple-500 text-purple-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        Settings
+                      </button>
+                    </nav>
+                  </div>
+
+                  {/* Tab Content */}
+                  {activeTab === 'details' && (
+                    <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-lg p-6 space-y-6">
+                      {/* Basic Information */}
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
+                        
+                        <div className="grid grid-cols-1 gap-6">
+                          <div>
+                            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                              Quiz Title *
+                            </label>
+                            <input
+                              type="text"
+                              id="title"
+                              value={formData.title}
+                              onChange={(e) => handleInputChange('title', e.target.value)}
+                              className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
+                                errors.title ? 'border-red-300' : 'border-gray-300'
+                              }`}
+                              placeholder="e.g., Quadratic Equations Assessment"
+                              required
+                            />
+                            {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title}</p>}
+                          </div>
+
+                          <div>
+                            <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                              Description
+                            </label>
+                            <textarea
+                              id="description"
+                              rows={3}
+                              value={formData.description}
+                              onChange={(e) => handleInputChange('description', e.target.value)}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              placeholder="Brief description of the quiz"
+                            />
+                          </div>
+
+                          <div>
+                            <label htmlFor="instructions" className="block text-sm font-medium text-gray-700">
+                              Instructions for Students
+                            </label>
+                            <textarea
+                              id="instructions"
+                              rows={4}
+                              value={formData.instructions}
+                              onChange={(e) => handleInputChange('instructions', e.target.value)}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              placeholder="Detailed instructions for students taking the quiz"
+                            />
+                          </div>
+
+                          <div>
+                            <label htmlFor="batch_id" className="block text-sm font-medium text-gray-700">
+                              Batch *
+                            </label>
+                            <select
+                              id="batch_id"
+                              value={formData.batch_id}
+                              onChange={(e) => handleInputChange('batch_id', e.target.value)}
+                              className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
+                                errors.batch_id ? 'border-red-300' : 'border-gray-300'
+                              }`}
+                              required
+                            >
+                              <option value="">Select a batch</option>
+                              {batches.map(batch => (
+                                <option key={batch.id} value={batch.id.toString()}>
+                                  {batch.name} ({batch.student_count} students)
+                                </option>
+                              ))}
+                            </select>
+                            {errors.batch_id && <p className="mt-1 text-sm text-red-600">{errors.batch_id}</p>}
+                            {selectedBatch && (
+                              <p className="mt-1 text-sm text-gray-500">
+                                This quiz will be available to {selectedBatch.student_count} students in {selectedBatch.name}
                               </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Scoring Settings */}
-                    <div className="border-t border-gray-200 pt-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                        <FileQuestion className="h-5 w-5 mr-2 text-purple-600" />
-                        Scoring
-                      </h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Total Marks */}
-                        <div>
-                          <label htmlFor="total_marks" className="block text-sm font-medium text-gray-700">
-                            Total Marks
-                          </label>
-                          <input
-                            type="number"
-                            id="total_marks"
-                            value={formData.total_marks}
-                            onChange={(e) => setFormData(prev => ({ ...prev, total_marks: e.target.value ? parseFloat(e.target.value) : '' }))}
-                            min="0"
-                            step="0.5"
-                            className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                              errors.total_marks ? 'border-red-300' : 'border-gray-300'
-                            }`}
-                            placeholder="e.g., 100"
-                          />
-                          <p className="mt-1 text-sm text-gray-500">
-                            Will be calculated automatically based on questions
-                          </p>
-                        </div>
-
-                        {/* Pass Marks */}
-                        <div>
-                          <label htmlFor="pass_marks" className="block text-sm font-medium text-gray-700">
-                            Pass Marks
-                          </label>
-                          <input
-                            type="number"
-                            id="pass_marks"
-                            value={formData.pass_marks}
-                            onChange={(e) => setFormData(prev => ({ ...prev, pass_marks: e.target.value ? parseFloat(e.target.value) : '' }))}
-                            min="0"
-                            step="0.5"
-                            className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                              errors.pass_marks ? 'border-red-300' : 'border-gray-300'
-                            }`}
-                            placeholder="e.g., 60"
-                          />
-                          {errors.pass_marks && (
-                            <p className="mt-1 text-sm text-red-600">{errors.pass_marks}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Timing Settings */}
-                    <div className="border-t border-gray-200 pt-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                        <Clock className="h-5 w-5 mr-2 text-purple-600" />
-                        Timing & Schedule
-                      </h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Duration */}
-                        <div>
-                          <label htmlFor="duration_minutes" className="block text-sm font-medium text-gray-700">
-                            Duration (minutes)
-                          </label>
-                          <select
-                            id="duration_minutes"
-                            value={formData.duration_minutes}
-                            onChange={(e) => setFormData(prev => ({ ...prev, duration_minutes: e.target.value ? parseInt(e.target.value) : '' }))}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                          >
-                            <option value="">No time limit</option>
-                            <option value={15}>15 minutes</option>
-                            <option value={30}>30 minutes</option>
-                            <option value={45}>45 minutes</option>
-                            <option value={60}>1 hour</option>
-                            <option value={90}>1.5 hours</option>
-                            <option value={120}>2 hours</option>
-                            <option value={180}>3 hours</option>
-                          </select>
-                        </div>
-
-                        {/* Max Attempts */}
-                        <div>
-                          <label htmlFor="max_attempts" className="block text-sm font-medium text-gray-700">
-                            Maximum Attempts
-                          </label>
-                          <select
-                            id="max_attempts"
-                            value={formData.max_attempts}
-                            onChange={(e) => setFormData(prev => ({ ...prev, max_attempts: e.target.value ? parseInt(e.target.value) : '' }))}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                          >
-                            <option value="">Unlimited</option>
-                            <option value={1}>1 attempt</option>
-                            <option value={2}>2 attempts</option>
-                            <option value={3}>3 attempts</option>
-                            <option value={5}>5 attempts</option>
-                          </select>
-                        </div>
-
-                        {/* Start Time */}
-                        <div>
-                          <label htmlFor="start_time" className="block text-sm font-medium text-gray-700">
-                            Start Time (Optional)
-                          </label>
-                          <input
-                            type="datetime-local"
-                            id="start_time"
-                            value={formData.start_time}
-                            onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
-                            min={getTomorrowDate()}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                          />
-                        </div>
-
-                        {/* End Time */}
-                        <div>
-                          <label htmlFor="end_time" className="block text-sm font-medium text-gray-700">
-                            End Time (Optional)
-                          </label>
-                          <input
-                            type="datetime-local"
-                            id="end_time"
-                            value={formData.end_time}
-                            onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
-                            min={formData.start_time || getTomorrowDate()}
-                            className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                              errors.end_time ? 'border-red-300' : 'border-gray-300'
-                            }`}
-                          />
-                          {errors.end_time && (
-                            <p className="mt-1 text-sm text-red-600">{errors.end_time}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Quiz Settings */}
-                    <div className="border-t border-gray-200 pt-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                        <Settings className="h-5 w-5 mr-2 text-purple-600" />
-                        Quiz Settings
-                      </h3>
-                      
-                      <div className="space-y-4">
-                        {/* Randomization */}
-                        <div className="bg-gray-50 p-4 rounded-md">
-                          <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                            <Shuffle className="h-4 w-4 mr-1" />
-                            Randomization
-                          </h4>
-                          <div className="space-y-3">
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.shuffle_questions}
-                                onChange={(e) => setFormData(prev => ({ ...prev, shuffle_questions: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Shuffle question order for each student
-                              </span>
-                            </label>
-                            
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.shuffle_options}
-                                onChange={(e) => setFormData(prev => ({ ...prev, shuffle_options: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Shuffle answer options for multiple choice questions
-                              </span>
-                            </label>
+                            )}
                           </div>
                         </div>
+                      </div>
 
-                        {/* Results & Review */}
-                        <div className="bg-gray-50 p-4 rounded-md">
-                          <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                            <Eye className="h-4 w-4 mr-1" />
-                            Results & Review
-                          </h4>
-                          <div className="space-y-3">
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.show_results_immediately}
-                                onChange={(e) => setFormData(prev => ({ ...prev, show_results_immediately: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Show results immediately after submission
-                              </span>
+                      {/* Scoring */}
+                      <div className="border-t border-gray-200 pt-6">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Scoring</h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label htmlFor="pass_marks" className="block text-sm font-medium text-gray-700">
+                              Pass Marks *
                             </label>
-                            
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.allow_review}
-                                onChange={(e) => setFormData(prev => ({ ...prev, allow_review: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Allow students to review their answers after submission
-                              </span>
+                            <input
+                              type="number"
+                              id="pass_marks"
+                              value={formData.pass_marks}
+                              onChange={(e) => handleInputChange('pass_marks', e.target.value === '' ? '' : parseInt(e.target.value))}
+                              min="0"
+                              className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
+                                errors.pass_marks ? 'border-red-300' : 'border-gray-300'
+                              }`}
+                              placeholder="Minimum marks to pass"
+                              required
+                            />
+                            {errors.pass_marks && <p className="mt-1 text-sm text-red-600">{errors.pass_marks}</p>}
+                            <p className="mt-1 text-sm text-gray-500">
+                              Total marks will be calculated based on questions added
+                            </p>
+                          </div>
+
+                          <div>
+                            <label htmlFor="duration_minutes" className="block text-sm font-medium text-gray-700">
+                              Duration (minutes)
                             </label>
+                            <input
+                              type="number"
+                              id="duration_minutes"
+                              value={formData.duration_minutes}
+                              onChange={(e) => handleInputChange('duration_minutes', e.target.value === '' ? '' : parseInt(e.target.value))}
+                              min="1"
+                              max="480"
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              placeholder="Leave empty for no time limit"
+                            />
+                            <p className="mt-1 text-sm text-gray-500">
+                              Maximum 8 hours (480 minutes)
+                            </p>
                           </div>
                         </div>
+                      </div>
 
-                        {/* Security */}
-                        <div className="bg-gray-50 p-4 rounded-md">
-                          <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                            <Shield className="h-4 w-4 mr-1" />
-                            Security Settings
-                          </h4>
-                          <div className="space-y-3">
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.auto_submit}
-                                onChange={(e) => setFormData(prev => ({ ...prev, auto_submit: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Auto-submit when time expires
-                              </span>
+                      {/* Schedule */}
+                      <div className="border-t border-gray-200 pt-6">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Schedule</h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div>
+                            <label htmlFor="start_time" className="block text-sm font-medium text-gray-700">
+                              Start Time
                             </label>
-                            
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.prevent_copy_paste}
-                                onChange={(e) => setFormData(prev => ({ ...prev, prevent_copy_paste: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Prevent copy and paste
-                              </span>
+                            <input
+                              type="datetime-local"
+                              id="start_time"
+                              value={formData.start_time}
+                              onChange={(e) => handleInputChange('start_time', e.target.value)}
+                              min={getMinStartTime()}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                            />
+                            <p className="mt-1 text-sm text-gray-500">
+                              Leave empty to start immediately
+                            </p>
+                          </div>
+
+                          <div>
+                            <label htmlFor="end_time" className="block text-sm font-medium text-gray-700">
+                              End Time
                             </label>
-                            
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.require_webcam}
-                                onChange={(e) => setFormData(prev => ({ ...prev, require_webcam: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Require webcam monitoring (experimental)
-                              </span>
+                            <input
+                              type="datetime-local"
+                              id="end_time"
+                              value={formData.end_time}
+                              onChange={(e) => handleInputChange('end_time', e.target.value)}
+                              min={getMinEndTime()}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                            />
+                            <p className="mt-1 text-sm text-gray-500">
+                              Leave empty for no end time
+                            </p>
+                          </div>
+
+                          <div>
+                            <label htmlFor="max_attempts" className="block text-sm font-medium text-gray-700">
+                              Max Attempts
                             </label>
+                            <input
+                              type="number"
+                              id="max_attempts"
+                              value={formData.max_attempts}
+                              onChange={(e) => handleInputChange('max_attempts', e.target.value === '' ? '' : parseInt(e.target.value))}
+                              min="1"
+                              max="10"
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              placeholder="Unlimited"
+                            />
+                            <p className="mt-1 text-sm text-gray-500">
+                              Leave empty for unlimited attempts
+                            </p>
                           </div>
                         </div>
                       </div>
                     </div>
+                  )}
 
-                    {/* Actions */}
-                    <div className="border-t border-gray-200 pt-6">
-                      <div className="flex justify-end space-x-3">
-                        <button
-                          type="button"
-                          className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleSubmit}
-                          disabled={processing}
-                          className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 ${
-                            processing ? 'opacity-50 cursor-not-allowed' : ''
-                          }`}
-                        >
-                          {processing ? 'Creating...' : 'Create Quiz'}
-                        </button>
+                  {activeTab === 'settings' && (
+                    <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-lg p-6 space-y-6">
+                      {/* Randomization Settings */}
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Randomization</h3>
+                        <div className="space-y-4">
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={formData.shuffle_questions}
+                              onChange={(e) => handleInputChange('shuffle_questions', e.target.checked)}
+                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Shuffle questions for each student</span>
+                          </label>
+                          
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={formData.shuffle_options}
+                              onChange={(e) => handleInputChange('shuffle_options', e.target.checked)}
+                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Shuffle answer options for MCQ questions</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Result Settings */}
+                      <div className="border-t border-gray-200 pt-6">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Results & Review</h3>
+                        <div className="space-y-4">
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={formData.show_results_immediately}
+                              onChange={(e) => handleInputChange('show_results_immediately', e.target.checked)}
+                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Show results immediately after submission</span>
+                          </label>
+                          
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={formData.allow_review}
+                              onChange={(e) => handleInputChange('allow_review', e.target.checked)}
+                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Allow students to review their answers</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Security Settings */}
+                      <div className="border-t border-gray-200 pt-6">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Security & Monitoring</h3>
+                        <div className="space-y-4">
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={formData.auto_submit}
+                              onChange={(e) => handleInputChange('auto_submit', e.target.checked)}
+                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Auto-submit when time limit is reached</span>
+                          </label>
+                          
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={formData.require_webcam}
+                              onChange={(e) => handleInputChange('require_webcam', e.target.checked)}
+                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Require webcam monitoring (proctoring)</span>
+                          </label>
+                          
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={formData.prevent_copy_paste}
+                              onChange={(e) => handleInputChange('prevent_copy_paste', e.target.checked)}
+                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Prevent copy/paste in quiz interface</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="mt-8 flex justify-between">
+                    <button
+                      type="button"
+                      onClick={goBack}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                    >
+                      Cancel
+                    </button>
+                    
+                    <button
+                      type="submit"
+                      disabled={processing}
+                      className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 ${
+                        processing ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {processing ? 'Creating...' : 'Create Quiz'}
+                    </button>
+                  </div>
+                </form>
+
+                {/* Information Box */}
+                <div className="mt-6 rounded-md bg-blue-50 p-4">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <AlertTriangle className="h-5 w-5 text-blue-400" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-blue-800">
+                        Next Steps
+                      </h3>
+                      <div className="mt-2 text-sm text-blue-700">
+                        <p>
+                          After creating this quiz, you'll be able to add questions, preview the quiz, and activate it for your students.
+                          The quiz will be saved as a draft until you add questions and activate it.
+                        </p>
                       </div>
                     </div>
                   </div>

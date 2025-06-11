@@ -1,62 +1,58 @@
 <?php
-// app/Services/QuizRandomizerService.php
 
 namespace App\Services;
+
+use App\Models\Quiz;
+use App\Models\Question;
+use Illuminate\Support\Collection;
 
 class QuizRandomizerService
 {
     /**
-     * Randomize questions for a user
+     * Get randomized questions for a quiz attempt
      */
-    public function randomizeQuestions($questions, $userId = null)
+    public function getRandomizedQuestions(Quiz $quiz): Collection
     {
-        if ($userId) {
-            // Use user ID as seed for consistent randomization per user
-            srand($userId);
+        $questions = $quiz->questions()->orderBy('order')->get();
+        
+        if ($quiz->shuffle_questions) {
+            $questions = $questions->shuffle();
         }
-
-        $randomizedQuestions = $questions->shuffle();
         
-        // Reset random seed
-        srand();
+        // Randomize options for each question if enabled
+        if ($quiz->shuffle_options) {
+            $questions = $questions->map(function ($question) {
+                if ($question->options && is_array($question->options)) {
+                    $shuffledOptions = collect($question->options)->shuffle()->values();
+                    $question->options = $shuffledOptions->toArray();
+                }
+                return $question;
+            });
+        }
         
-        return $randomizedQuestions;
+        return $questions;
     }
-
+    
     /**
-     * Randomize MCQ options
+     * Prepare questions for display (without correct answers)
      */
-    public function randomizeOptions($options, $userId = null, $questionId = null)
+    public function prepareQuestionsForDisplay(Collection $questions): Collection
     {
-        if ($userId && $questionId) {
-            // Use combined seed for consistent randomization
-            srand($userId + $questionId);
-        }
-
-        $shuffled = collect($options)->shuffle()->toArray();
-        
-        // Reset random seed
-        srand();
-        
-        return $shuffled;
-    }
-
-    /**
-     * Generate randomized quiz for user
-     */
-    public function generateUserQuiz($quiz, $userId)
-    {
-        $questions = $quiz->questions;
-        
-        if ($quiz->randomize_questions) {
-            $questions = $this->randomizeQuestions($questions, $userId);
-        }
-
-        return $questions->map(function ($question) use ($userId, $quiz) {
-            if ($question->type === 'mcq' && $quiz->randomize_options) {
-                $question->options = $this->randomizeOptions($question->options, $userId, $question->id);
+        return $questions->map(function ($question) {
+            // Remove correct answers and explanations for display
+            $displayQuestion = $question->toArray();
+            unset($displayQuestion['correct_answer']);
+            unset($displayQuestion['explanation']);
+            
+            // Ensure options are properly formatted
+            if ($question->type === 'true_false') {
+                $displayQuestion['options'] = [
+                    ['id' => 'true', 'text' => 'True'],
+                    ['id' => 'false', 'text' => 'False']
+                ];
             }
-            return $question;
+            
+            return $displayQuestion;
         });
     }
 }
