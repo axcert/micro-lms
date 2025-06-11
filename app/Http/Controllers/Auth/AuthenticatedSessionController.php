@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Enums\UserRole;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -57,11 +58,11 @@ class AuthenticatedSessionController extends Controller
         }
 
         switch($user->role) {
-            case 'admin':
+            case UserRole::ADMIN:
                 return redirect()->route('admin.dashboard');
-            case 'teacher':
+            case UserRole::TEACHER:
                 return redirect()->route('teacher.dashboard');
-            case 'student':
+            case UserRole::STUDENT:
                 return redirect()->route('student.dashboard');
             default:
                 return redirect()->route('dashboard');

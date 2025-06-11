@@ -3,16 +3,18 @@
 namespace App\Http\Requests\Teacher;
 
 use Illuminate\Foundation\Http\FormRequest;
-use App\Enums\QuestionType;
 
-class CreateQuestionRequest extends FormRequest
+class UpdateQuestionRequest extends FormRequest
 {
     public function authorize()
     {
         $quiz = $this->route('quiz');
+        $question = $this->route('question');
+        
         return auth()->check() && 
                auth()->user()->role === 'teacher' &&
-               $quiz->batch->teacher_id === auth()->id();
+               $quiz->batch->teacher_id === auth()->id() &&
+               $question->quiz_id === $quiz->id;
     }
 
     public function rules()

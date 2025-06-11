@@ -1,134 +1,167 @@
 import React from 'react';
-import { Lock, Shield, ArrowLeft, Mail, HelpCircle, AlertCircle, Key, User } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import GuestLayout from '@/Layouts/GuestLayout';
 
-const Modern403Page = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-tr from-white via-purple-50 to-yellow-50 relative overflow-hidden">
-      {/* Geometric background pattern */}
-      <div className="absolute inset-0">
-        <div className="absolute top-0 left-0 w-full h-full opacity-10">
-          <div className="absolute top-20 left-20 w-64 h-64 bg-purple-600 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-20 w-80 h-80 bg-yellow-400 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-400 rounded-full blur-3xl"></div>
-        </div>
-        
-        {/* Floating geometric shapes */}
-        <div className="absolute top-32 right-32 w-16 h-16 bg-yellow-400 rotate-45 opacity-20 animate-pulse"></div>
-        <div className="absolute bottom-40 left-40 w-12 h-12 bg-purple-600 rotate-12 opacity-20 animate-bounce"></div>
-        <div className="absolute top-1/3 left-20 w-8 h-8 bg-yellow-500 rounded-full opacity-30 animate-pulse delay-1000"></div>
-      </div>
+interface ErrorProps {
+    status: number;
+    message: string;
+    description: string;
+    auth?: {
+        user?: {
+            id: number;
+            name: string;
+            email: string;
+            role: string;
+        } | null;
+    };
+}
 
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-5xl w-full">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
+export default function Error403({ status, message, description, auth }: ErrorProps) {
+    const user = auth?.user;
+    
+    // Role-specific dashboard routes
+    const getDashboardRoute = (role: string) => {
+        switch (role) {
+            case 'admin':
+                return '/admin/dashboard';
+            case 'teacher':
+                return '/teacher/dashboard';
+            case 'student':
+                return '/student/dashboard';
+            default:
+                return '/dashboard';
+        }
+    };
+
+    // Role-specific quick actions
+    const getQuickActions = (role: string) => {
+        switch (role) {
+            case 'student':
+                return [
+                    { label: 'My Classes', href: '/student/classes' },
+                    { label: 'Take Quizzes', href: '/student/quizzes' },
+                    { label: 'View Results', href: '/student/results' },
+                ];
+            case 'teacher':
+                return [
+                    { label: 'My Batches', href: '/teacher/batches' },
+                    { label: 'Schedule Classes', href: '/teacher/classes' },
+                    { label: 'Create Quizzes', href: '/teacher/quizzes' },
+                ];
+            case 'admin':
+                return [
+                    { label: 'Manage Teachers', href: '/admin/teachers' },
+                    { label: 'View Students', href: '/admin/students' },
+                    { label: 'System Reports', href: '/admin/reports' },
+                ];
+            default:
+                return [];
+        }
+    };
+
+    const quickActions = user ? getQuickActions(user.role) : [];
+
+    return (
+        <GuestLayout>
+            <Head title={`${status} - ${message}`} />
             
-            {/* Left side - Illustration */}
-            <div className="order-2 md:order-1">
-              <div className="relative">
-                {/* Main lock illustration */}
-                <div className="bg-gradient-to-br from-purple-600 to-purple-800 rounded-3xl p-12 shadow-2xl transform rotate-3 hover:rotate-0 transition-transform duration-500">
-                  <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                    <Lock className="w-24 h-24 text-yellow-400 mx-auto mb-6" />
-                    <div className="text-center">
-                      <div className="text-6xl font-black text-yellow-400 mb-2">403</div>
-                      <div className="text-white font-semibold">Access Restricted</div>
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50">
+                <div className="max-w-lg mx-auto text-center px-4">
+                    {/* Lock Icon */}
+                    <div className="mb-8">
+                        <div className="mx-auto w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6">
+                            <svg className="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                        </div>
+                        <h1 className="text-6xl font-bold text-red-600 mb-4">
+                            {status}
+                        </h1>
+                        <div className="w-24 h-1 bg-gradient-to-r from-red-500 to-orange-500 mx-auto rounded-full"></div>
                     </div>
-                  </div>
+
+                    {/* Error Message */}
+                    <div className="mb-8">
+                        <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+                            {message}
+                        </h2>
+                        <p className="text-gray-600 leading-relaxed">
+                            {description}
+                        </p>
+                    </div>
+
+                    {/* User Info */}
+                    {user && (
+                        <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                            <p className="text-sm text-blue-700">
+                                Logged in as <span className="font-semibold">{user.name}</span> ({user.role})
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Primary Actions */}
+                    <div className="space-y-4 mb-6">
+                        {user ? (
+                            <Link
+                                href={getDashboardRoute(user.role)}
+                                className="inline-flex items-center px-6 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors duration-200"
+                            >
+                                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2zm0 0V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                                </svg>
+                                Go to My Dashboard
+                            </Link>
+                        ) : (
+                            <Link
+                                href="/login"
+                                className="inline-flex items-center px-6 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors duration-200"
+                            >
+                                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                                </svg>
+                                Login to Your Account
+                            </Link>
+                        )}
+                        
+                        <div>
+                            <button
+                                onClick={() => window.history.back()}
+                                className="text-red-600 hover:text-red-800 font-medium underline"
+                            >
+                                Go Back
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Quick Actions for logged-in users */}
+                    {user && quickActions.length > 0 && (
+                        <div className="mb-6">
+                            <h3 className="text-sm font-semibold text-gray-700 mb-3">Quick Actions:</h3>
+                            <div className="grid grid-cols-1 gap-2">
+                                {quickActions.map((action, index) => (
+                                    <Link
+                                        key={index}
+                                        href={action.href}
+                                        className="px-4 py-2 text-sm bg-white border border-red-200 text-red-700 rounded-md hover:bg-red-50 transition-colors duration-200"
+                                    >
+                                        {action.label}
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Additional Help */}
+                    <div className="mt-8 p-4 bg-red-50 rounded-lg">
+                        <p className="text-sm text-red-700">
+                            {user 
+                                ? `Your ${user.role} account doesn't have permission for this action. Contact your administrator if you believe this is an error.`
+                                : 'Need access? Please login with an account that has the required permissions.'
+                            }
+                        </p>
+                    </div>
                 </div>
-                
-                {/* Floating elements */}
-                <div className="absolute -top-4 -right-4 bg-yellow-400 rounded-full p-3 shadow-lg animate-bounce">
-                  <Shield className="w-6 h-6 text-purple-900" />
-                </div>
-                <div className="absolute -bottom-4 -left-4 bg-white rounded-full p-3 shadow-lg animate-pulse">
-                  <Key className="w-6 h-6 text-purple-600" />
-                </div>
-              </div>
             </div>
-
-            {/* Right side - Content */}
-            <div className="order-1 md:order-2 space-y-8">
-              <div>
-                <h1 className="text-5xl md:text-6xl font-black text-purple-900 mb-6 leading-tight">
-                  Access
-                  <span className="block text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600">
-                    Denied
-                  </span>
-                </h1>
-                <p className="text-xl text-gray-600 leading-relaxed">
-                  This classroom requires special permissions. Let's check your enrollment status and get you back on track!
-                </p>
-              </div>
-
-              {/* Info cards */}
-              <div className="space-y-4">
-                <div className="bg-white rounded-2xl p-6 shadow-lg border-l-4 border-yellow-400">
-                  <div className="flex items-start space-x-4">
-                    <div className="bg-yellow-100 rounded-full p-2">
-                      <User className="w-5 h-5 text-yellow-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-purple-900 mb-1">Check Your Role</h3>
-                      <p className="text-gray-600 text-sm">Make sure you have the right permissions for this content</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white rounded-2xl p-6 shadow-lg border-l-4 border-purple-600">
-                  <div className="flex items-start space-x-4">
-                    <div className="bg-purple-100 rounded-full p-2">
-                      <AlertCircle className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-purple-900 mb-1">Batch Enrollment</h3>
-                      <p className="text-gray-600 text-sm">You might not be enrolled in the required batch or course</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div className="space-y-4">
-                <button className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3">
-                  <ArrowLeft className="w-6 h-6" />
-                  <span className="text-lg">Go Back</span>
-                </button>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <button className="bg-yellow-400 hover:bg-yellow-500 text-purple-900 font-semibold py-3 px-6 rounded-2xl transition-all duration-300 flex items-center justify-center space-x-2 transform hover:scale-105">
-                    <Mail className="w-5 h-5" />
-                    <span>Contact Teacher</span>
-                  </button>
-                  
-                  <button className="bg-white hover:bg-gray-50 text-purple-900 font-semibold py-3 px-6 rounded-2xl border-2 border-purple-200 hover:border-purple-300 transition-all duration-300 flex items-center justify-center space-x-2 transform hover:scale-105">
-                    <HelpCircle className="w-5 h-5" />
-                    <span>Get Help</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Help text */}
-              <div className="bg-gradient-to-r from-purple-100 to-yellow-100 rounded-2xl p-6 border border-purple-200">
-                <div className="flex items-center space-x-3 mb-3">
-                  <div className="bg-gradient-to-r from-purple-600 to-yellow-500 rounded-full p-2">
-                    <HelpCircle className="w-5 h-5 text-white" />
-                  </div>
-                  <h4 className="font-bold text-purple-900">Need Immediate Help?</h4>
-                </div>
-                <p className="text-gray-700 text-sm mb-3">
-                  If you believe this is an error, please contact your administrator or teacher for assistance.
-                </p>
-                <a href="#" className="inline-flex items-center text-purple-600 hover:text-purple-700 font-medium text-sm transition-colors">
-                  <span>Contact Support Team</span>
-                  <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Modern403Page;
+        </GuestLayout>
+    );
+}

@@ -4,9 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Quiz extends Model
 {
@@ -15,166 +12,194 @@ class Quiz extends Model
     protected $fillable = [
         'title',
         'description',
+        'instructions',
         'batch_id',
-        'teacher_id',
+        'total_marks',
+        'pass_marks',
+        'duration_minutes',
         'start_time',
         'end_time',
-        'duration_minutes',
-        'total_marks',
-        'is_active',
-        'randomize_questions',
+        'max_attempts',
+        'shuffle_questions',
+        'shuffle_options',
+        'show_results_immediately',
+        'allow_review',
+        'auto_submit',
+        'require_webcam',
+        'prevent_copy_paste',
+        'status'
     ];
 
     protected $casts = [
         'start_time' => 'datetime',
         'end_time' => 'datetime',
-        'is_active' => 'boolean',
-        'randomize_questions' => 'boolean',
+        'shuffle_questions' => 'boolean',
+        'shuffle_options' => 'boolean',
+        'show_results_immediately' => 'boolean',
+        'allow_review' => 'boolean',
+        'auto_submit' => 'boolean',
+        'require_webcam' => 'boolean',
+        'prevent_copy_paste' => 'boolean',
+        'total_marks' => 'integer',
+        'pass_marks' => 'integer',
+        'duration_minutes' => 'integer',
+        'max_attempts' => 'integer'
     ];
 
-    /**
-     * Get the batch that owns the quiz.
-     */
-    public function batch(): BelongsTo
+    protected $dates = [
+        'start_time',
+        'end_time',
+        'created_at',
+        'updated_at'
+    ];
+
+    // Relationships
+    public function batch()
     {
         return $this->belongsTo(Batch::class);
     }
 
-    /**
-     * Get the teacher that created the quiz.
-     */
-    public function teacher(): BelongsTo
+    public function questions()
     {
-        return $this->belongsTo(User::class, 'teacher_id');
+        return $this->hasMany(Question::class)->orderBy('order');
     }
 
-    /**
-     * Get the quiz attempts using your actual column names.
-     */
-    public function attempts(): HasMany
+    public function attempts()
     {
         return $this->hasMany(QuizAttempt::class);
     }
 
-    /**
-     * Get questions for the quiz (if you have a Question model)
-     */
-    public function questions(): HasMany
+    public function completedAttempts()
     {
-        return $this->hasMany(Question::class);
+        return $this->hasMany(QuizAttempt::class)->whereNotNull('submitted_at');
     }
 
-    /**
-     * Get students who have attempted this quiz using your actual schema
-     */
-    public function attemptedByStudents(): BelongsToMany
+    // Accessors & Computed Properties
+    public function getIsAvailableAttribute()
     {
-        return $this->belongsToMany(
-            User::class, 
-            'quiz_attempts',    // pivot table name
-            'quiz_id',          // foreign key for this model (Quiz) in pivot table
-            'student_id'        // foreign key for related model (User) in pivot table - use student_id
-        )->withPivot(['total_score', 'max_score', 'status', 'submitted_at'])
-         ->withTimestamps();
+        if ($this->status !== 'active') {
+            return false;
+        }
+
+        $now = now();
+        
+        if ($this->start_time && $now->lt($this->start_time)) {
+            return false;
+        }
+        
+        if ($this->end_time && $now->gt($this->end_time)) {
+            return false;
+        }
+
+        return true;
     }
 
-    /**
-     * Scope to get pending quizzes for a specific student.
-     * FIXED to use your actual column names
-     */
-    public function scopePendingForStudent($query, $studentId)
+    public function getCanEditAttribute()
     {
-        return $query->where('end_time', '>=', now())
-                     ->where('is_active', true)
-                     ->whereDoesntHave('attempts', function ($query) use ($studentId) {
-                         $query->where('student_id', $studentId)  // Use student_id
-                               ->whereIn('status', ['submitted', 'completed']); // Use status
-                     });
+        return $this->status === 'draft' || 
+               ($this->status === 'active' && $this->attempts()->count() === 0);
     }
 
-    /**
-     * Scope to get quizzes available to a student (through their batches)
-     */
-    public function scopeAvailableToStudent($query, $studentId)
+    public function getPassRateAttribute()
     {
-        return $query->whereHas('batch.students', function ($query) use ($studentId) {
-            $query->where('batch_students.student_id', $studentId); // batch_students uses student_id
+        $totalAttempts = $this->completedAttempts()->count();
+        if ($totalAttempts === 0) return 0;
+
+        $passedAttempts = $this->completedAttempts()->where('has_passed', true)->count();
+        return ($passedAttempts / $totalAttempts) * 100;
+    }
+
+    public function getAverageScoreAttribute()
+    {
+        return $this->completedAttempts()->avg('score') ?? 0;
+    }
+
+    public function getCompletionRateAttribute()
+    {
+        if ($this->batch->student_count === 0) return 0;
+        
+        $totalAttempts = $this->completedAttempts()->count();
+        return ($totalAttempts / $this->batch->student_count) * 100;
+    }
+
+    // Scopes
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active');
+    }
+
+    public function scopeDraft($query)
+    {
+        return $query->where('status', 'draft');
+    }
+
+    public function scopeArchived($query)
+    {
+        return $query->where('status', 'archived');
+    }
+
+    public function scopeAvailable($query)
+    {
+        return $query->where('status', 'active')
+                    ->where(function ($q) {
+                        $q->whereNull('start_time')->orWhere('start_time', '<=', now());
+                    })
+                    ->where(function ($q) {
+                        $q->whereNull('end_time')->orWhere('end_time', '>=', now());
+                    });
+    }
+
+    public function scopeForTeacher($query, $teacherId)
+    {
+        return $query->whereHas('batch', function ($q) use ($teacherId) {
+            $q->where('teacher_id', $teacherId);
         });
     }
 
-    /**
-     * Check if a student has completed this quiz using your actual schema
-     */
-    public function hasBeenCompletedBy($studentId): bool
+    // Methods
+    public function canBeAttemptedBy($student)
     {
-        return $this->attempts()
-                    ->where('student_id', $studentId)  // Use student_id
-                    ->whereIn('status', ['submitted', 'completed']) // Use status
-                    ->exists();
-    }
-
-    /**
-     * Check if a student has an in-progress attempt for this quiz
-     */
-    public function hasInProgressAttemptBy($studentId): bool
-    {
-        return $this->attempts()
-                    ->where('student_id', $studentId)  // Use student_id
-                    ->whereIn('status', ['started', 'in_progress']) // Use status
-                    ->exists();
-    }
-
-    /**
-     * Get a student's attempt for this quiz using your actual schema
-     */
-    public function getAttemptByStudent($studentId)
-    {
-        return $this->attempts()
-                    ->where('student_id', $studentId)  // Use student_id
-                    ->first();
-    }
-
-    /**
-     * Get a student's latest attempt for this quiz
-     */
-    public function getLatestAttemptByStudent($studentId)
-    {
-        return $this->attempts()
-                    ->where('student_id', $studentId)  // Use student_id
-                    ->latest()
-                    ->first();
-    }
-
-    /**
-     * Get completed attempts count using your actual schema
-     */
-    public function getCompletedAttemptsCountAttribute(): int
-    {
-        return $this->attempts()
-                    ->whereIn('status', ['submitted', 'completed']) // Use status
-                    ->count();
-    }
-
-    /**
-     * Get average score for completed attempts using your actual schema
-     */
-    public function getAverageScoreAttribute(): float
-    {
-        $completedAttempts = $this->attempts()
-                                 ->whereIn('status', ['submitted', 'completed']) // Use status
-                                 ->whereNotNull('total_score')
-                                 ->whereNotNull('max_score')
-                                 ->where('max_score', '>', 0);
-
-        if ($completedAttempts->count() === 0) {
-            return 0;
+        if (!$this->is_available) {
+            return false;
         }
 
-        $averagePercentage = $completedAttempts->get()
-                                               ->avg(function ($attempt) {
-                                                   return ($attempt->total_score / $attempt->max_score) * 100;
-                                               });
+        if ($this->max_attempts) {
+            $studentAttempts = $this->attempts()
+                ->where('student_id', $student->id)
+                ->whereNotNull('submitted_at')
+                ->count();
+                
+            if ($studentAttempts >= $this->max_attempts) {
+                return false;
+            }
+        }
 
-        return round($averagePercentage, 2);
+        return true;
+    }
+
+    public function getStudentAttemptCount($studentId)
+    {
+        return $this->attempts()
+            ->where('student_id', $studentId)
+            ->whereNotNull('submitted_at')
+            ->count();
+    }
+
+    public function getStudentBestScore($studentId)
+    {
+        return $this->attempts()
+            ->where('student_id', $studentId)
+            ->whereNotNull('submitted_at')
+            ->max('score');
+    }
+
+    public function calculateTotalMarks()
+    {
+        return $this->questions()->sum('marks');
+    }
+
+    public function updateTotalMarks()
+    {
+        $this->update(['total_marks' => $this->calculateTotalMarks()]);
     }
 }

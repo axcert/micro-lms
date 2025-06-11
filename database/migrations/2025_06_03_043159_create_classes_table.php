@@ -15,6 +15,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->foreignId('batch_id')->constrained()->onDelete('cascade');
             $table->string('zoom_link')->nullable();
+            $table->string('zoom_meeting_id')->nullable(); // Added this line
             $table->timestamp('scheduled_at');
             $table->integer('duration_minutes')->default(60);
             $table->enum('status', ['scheduled', 'ongoing', 'completed', 'cancelled'])->default('scheduled');

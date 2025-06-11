@@ -87,7 +87,16 @@ class Batch extends Model
     }
 
     /**
-     * Get the classes for the batch.
+     * Get the lessons for the batch (using Lesson model that points to classes table).
+     * THIS IS THE NEW RELATIONSHIP THAT FIXES THE DASHBOARD
+     */
+    public function lessons(): HasMany
+    {
+        return $this->hasMany(Lesson::class);
+    }
+
+    /**
+     * Get the classes for the batch (if you have ClassModel).
      */
     public function classes(): HasMany
     {
@@ -433,7 +442,7 @@ class Batch extends Model
 
         // Clean up related data when deleting
         static::deleting(function ($batch) {
-            // Remove all student associa`tions
+            // Remove all student associations
             $batch->students()->detach();
             
             // Note: You might want to handle classes and quizzes differently

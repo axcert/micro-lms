@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Head, router } from '@inertiajs/react';
 import { 
   FileQuestion, 
   Plus, 
@@ -19,7 +20,8 @@ import {
   Bell,
   Settings,
   Archive,
-  Copy
+  Copy,
+  Trash2
 } from 'lucide-react';
 
 interface Batch {
@@ -37,6 +39,7 @@ interface Quiz {
   duration_minutes: number | null;
   questions_count: number;
   attempts_count: number;
+  completed_attempts_count: number;
   average_score: number;
   pass_rate: number;
   start_time: string | null;
@@ -47,6 +50,7 @@ interface Quiz {
     student_count: number;
   };
   is_available: boolean;
+  can_edit: boolean;
   created_at: string;
 }
 
@@ -57,111 +61,94 @@ interface Stats {
   total_attempts: number;
 }
 
-export default function TeacherQuizzesIndex() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [batchFilter, setBatchFilter] = useState('');
+interface QuizIndexProps {
+  quizzes: {
+    data: Quiz[];
+    links: any[];
+    meta: any;
+  };
+  stats: Stats;
+  batches: Batch[];
+  filters: {
+    status?: string;
+    batch_id?: string;
+    search?: string;
+  };
+  flash?: {
+    success?: string;
+    error?: string;
+  };
+}
 
-  // Mock data
-  const stats: Stats = {
-    total_quizzes: 15,
-    active_quizzes: 8,
-    draft_quizzes: 5,
-    total_attempts: 142
+export default function QuizIndex({ 
+  quizzes, 
+  stats, 
+  batches, 
+  filters = {},
+  flash = {}
+}: QuizIndexProps) {
+  const [searchTerm, setSearchTerm] = useState(filters.search || '');
+  const [statusFilter, setStatusFilter] = useState(filters.status || '');
+  const [batchFilter, setBatchFilter] = useState(filters.batch_id || '');
+  const [showActionMenu, setShowActionMenu] = useState<number | null>(null);
+
+  const handleSearch = () => {
+    router.get('/teacher/quizzes', {
+      search: searchTerm,
+      status: statusFilter,
+      batch_id: batchFilter
+    }, {
+      preserveState: true,
+      replace: true
+    });
   };
 
-  const mockBatches: Batch[] = [
-    { id: 1, name: "Mathematics Grade 10 - Morning" },
-    { id: 2, name: "Physics Grade 11 - Afternoon" },
-    { id: 3, name: "Chemistry Grade 12 - Evening" },
-    { id: 4, name: "Biology Grade 9 - Morning" }
-  ];
+  const handleFilterChange = (filterType: string, value: string) => {
+    const newFilters = {
+      search: searchTerm,
+      status: statusFilter,
+      batch_id: batchFilter,
+      [filterType]: value
+    };
 
-  const mockQuizzes: Quiz[] = [
-    {
-      id: 1,
-      title: "Quadratic Equations Assessment",
-      description: "Comprehensive test covering quadratic equations, graphing, and real-world applications",
-      status: "active",
-      total_marks: 50,
-      pass_marks: 30,
-      duration_minutes: 60,
-      questions_count: 15,
-      attempts_count: 25,
-      average_score: 38.5,
-      pass_rate: 84.0,
-      start_time: "2024-06-01T09:00:00Z",
-      end_time: "2024-06-15T23:59:00Z",
-      batch: { id: 1, name: "Mathematics Grade 10 - Morning", student_count: 28 },
-      is_available: true,
-      created_at: "2024-05-25T10:00:00Z"
-    },
-    {
-      id: 2,
-      title: "Newton's Laws Quiz",
-      description: "Quick assessment on understanding of Newton's three laws of motion",
-      status: "active",
-      total_marks: 30,
-      pass_marks: 18,
-      duration_minutes: 30,
-      questions_count: 10,
-      attempts_count: 22,
-      average_score: 24.2,
-      pass_rate: 90.9,
-      start_time: "2024-06-03T14:00:00Z",
-      end_time: "2024-06-10T18:00:00Z",
-      batch: { id: 2, name: "Physics Grade 11 - Afternoon", student_count: 25 },
-      is_available: true,
-      created_at: "2024-05-28T14:30:00Z"
-    },
-    {
-      id: 3,
-      title: "Organic Chemistry Final",
-      description: "Comprehensive final examination covering all organic chemistry topics",
-      status: "draft",
-      total_marks: 100,
-      pass_marks: 60,
-      duration_minutes: 120,
-      questions_count: 8,
-      attempts_count: 0,
-      average_score: 0,
-      pass_rate: 0,
-      start_time: null,
-      end_time: null,
-      batch: { id: 3, name: "Chemistry Grade 12 - Evening", student_count: 20 },
-      is_available: false,
-      created_at: "2024-06-02T18:00:00Z"
-    },
-    {
-      id: 4,
-      title: "Cell Biology Basics",
-      description: "Introduction to cell structure and basic cellular processes",
-      status: "archived",
-      total_marks: 40,
-      pass_marks: 24,
-      duration_minutes: 45,
-      questions_count: 12,
-      attempts_count: 19,
-      average_score: 32.1,
-      pass_rate: 78.9,
-      start_time: "2024-05-15T09:00:00Z",
-      end_time: "2024-05-30T23:59:00Z",
-      batch: { id: 4, name: "Biology Grade 9 - Morning", student_count: 22 },
-      is_available: false,
-      created_at: "2024-05-10T11:00:00Z"
+    if (filterType === 'status') setStatusFilter(value);
+    if (filterType === 'batch_id') setBatchFilter(value);
+
+    router.get('/teacher/quizzes', newFilters, {
+      preserveState: true,
+      replace: true
+    });
+  };
+
+  const handleQuizAction = (action: string, quizId: number) => {
+    setShowActionMenu(null);
+    
+    switch (action) {
+      case 'view':
+        router.visit(`/teacher/quizzes/${quizId}`);
+        break;
+      case 'edit':
+        router.visit(`/teacher/quizzes/${quizId}/edit`);
+        break;
+      case 'results':
+        router.visit(`/teacher/quizzes/${quizId}/results`);
+        break;
+      case 'activate':
+        router.post(`/teacher/quizzes/${quizId}/activate`);
+        break;
+      case 'archive':
+        router.post(`/teacher/quizzes/${quizId}/archive`);
+        break;
+      case 'duplicate':
+        router.post(`/teacher/quizzes/${quizId}/duplicate`);
+        break;
+      case 'delete':
+        if (confirm('Are you sure you want to delete this quiz? This action cannot be undone.')) {
+          router.delete(`/teacher/quizzes/${quizId}`);
+        }
+        break;
     }
-  ];
-
-  const filteredQuizzes = mockQuizzes.filter(quiz => {
-    const matchesSearch = quiz.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         quiz.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         quiz.batch.name.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = !statusFilter || quiz.status === statusFilter;
-    const matchesBatch = !batchFilter || quiz.batch.id.toString() === batchFilter;
-    
-    return matchesSearch && matchesStatus && matchesBatch;
-  });
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -198,6 +185,8 @@ export default function TeacherQuizzesIndex() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Head title="My Quizzes" />
+      
       {/* Navigation Header */}
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -235,19 +224,19 @@ export default function TeacherQuizzesIndex() {
           <div className="flex-1 flex flex-col min-h-0 bg-white border-r border-gray-200">
             <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
               <nav className="mt-5 flex-1 px-2 space-y-1">
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <a href="/teacher/batches" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
                   <BookOpen className="text-gray-400 mr-3 h-5 w-5" />
                   Batches
                 </a>
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <a href="/teacher/classes" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
                   <FileQuestion className="text-gray-400 mr-3 h-5 w-5" />
                   Classes
                 </a>
-                <a href="#" className="bg-purple-100 text-purple-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <a href="/teacher/quizzes" className="bg-purple-100 text-purple-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
                   <FileQuestion className="text-purple-500 mr-3 h-5 w-5" />
                   Quizzes
                 </a>
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
+                <a href="/teacher/students" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
                   <Users className="text-gray-400 mr-3 h-5 w-5" />
                   Students
                 </a>
@@ -281,6 +270,7 @@ export default function TeacherQuizzesIndex() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => router.visit('/teacher/quizzes/create')}
                       className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                     >
                       <Plus className="-ml-1 mr-2 h-5 w-5" />
@@ -289,16 +279,36 @@ export default function TeacherQuizzesIndex() {
                   </div>
                 </div>
 
-                {/* Success Message */}
-                <div className="mb-4 rounded-md bg-green-50 p-4">
-                  <div className="flex">
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-green-800">
-                        Quiz "Quadratic Equations Assessment" created successfully!
-                      </p>
+                {/* Flash Messages */}
+                {flash.success && (
+                  <div className="mb-4 rounded-md bg-green-50 p-4">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <CheckCircle className="h-5 w-5 text-green-400" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-green-800">
+                          {flash.success}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {flash.error && (
+                  <div className="mb-4 rounded-md bg-red-50 p-4">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <XCircle className="h-5 w-5 text-red-400" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-red-800">
+                          {flash.error}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Stats Cards */}
                 <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -394,6 +404,7 @@ export default function TeacherQuizzesIndex() {
                           placeholder="Search quizzes..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                           className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
                         />
                       </div>
@@ -401,7 +412,7 @@ export default function TeacherQuizzesIndex() {
                     
                     <select
                       value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
+                      onChange={(e) => handleFilterChange('status', e.target.value)}
                       className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md"
                     >
                       <option value="">All Status</option>
@@ -412,35 +423,46 @@ export default function TeacherQuizzesIndex() {
                     
                     <select
                       value={batchFilter}
-                      onChange={(e) => setBatchFilter(e.target.value)}
+                      onChange={(e) => handleFilterChange('batch_id', e.target.value)}
                       className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md"
                     >
                       <option value="">All Batches</option>
-                      {mockBatches.map(batch => (
+                      {batches.map(batch => (
                         <option key={batch.id} value={batch.id.toString()}>
                           {batch.name}
                         </option>
                       ))}
                     </select>
                   </div>
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleSearch}
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                    >
+                      <Search className="h-4 w-4 mr-1" />
+                      Search
+                    </button>
+                  </div>
                 </div>
 
                 {/* Quizzes List */}
                 <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                  {filteredQuizzes.length === 0 ? (
+                  {quizzes.data.length === 0 ? (
                     <div className="text-center py-12">
                       <FileQuestion className="mx-auto h-12 w-12 text-gray-400" />
                       <h3 className="mt-2 text-sm font-medium text-gray-900">No quizzes found</h3>
                       <p className="mt-1 text-sm text-gray-500">
-                        {searchTerm || statusFilter || batchFilter 
+                        {Object.values(filters).some(f => f) 
                           ? "Try adjusting your search or filter criteria."
                           : "Get started by creating your first quiz."
                         }
                       </p>
-                      {!searchTerm && !statusFilter && !batchFilter && (
+                      {!Object.values(filters).some(f => f) && (
                         <div className="mt-6">
                           <button
                             type="button"
+                            onClick={() => router.visit('/teacher/quizzes/create')}
                             className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                           >
                             <Plus className="-ml-1 mr-2 h-5 w-5" />
@@ -451,7 +473,7 @@ export default function TeacherQuizzesIndex() {
                     </div>
                   ) : (
                     <ul className="divide-y divide-gray-200">
-                      {filteredQuizzes.map((quiz) => {
+                      {quizzes.data.map((quiz) => {
                         const statusInfo = getStatusInfo(quiz.status);
                         const StatusIcon = statusInfo.icon;
                         
@@ -478,6 +500,7 @@ export default function TeacherQuizzesIndex() {
                                     <div className="flex items-center space-x-2">
                                       <button
                                         type="button"
+                                        onClick={() => handleQuizAction('view', quiz.id)}
                                         className="text-sm font-medium text-gray-900 hover:text-purple-600 truncate text-left"
                                       >
                                         {quiz.title}
@@ -485,6 +508,11 @@ export default function TeacherQuizzesIndex() {
                                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
                                         {statusInfo.text}
                                       </span>
+                                      {!quiz.is_available && quiz.status === 'active' && (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                          Scheduled
+                                        </span>
+                                      )}
                                     </div>
                                     
                                     <div className="mt-1">
@@ -492,7 +520,7 @@ export default function TeacherQuizzesIndex() {
                                         {quiz.description}
                                       </p>
                                       <p className="text-xs text-gray-400 mt-1">
-                                        {quiz.batch.name}
+                                        {quiz.batch.name} • Created {formatDate(quiz.created_at)}
                                       </p>
                                     </div>
                                     
@@ -512,10 +540,10 @@ export default function TeacherQuizzesIndex() {
                                         {getDurationText(quiz.duration_minutes)}
                                       </div>
                                       
-                                      {quiz.attempts_count > 0 && (
+                                      {quiz.completed_attempts_count > 0 && (
                                         <div className="flex items-center">
                                           <TrendingUp className="flex-shrink-0 mr-1.5 h-4 w-4" />
-                                          {quiz.attempts_count} attempts ({quiz.pass_rate}% pass rate)
+                                          {quiz.completed_attempts_count} attempts ({quiz.pass_rate.toFixed(1)}% pass rate)
                                         </div>
                                       )}
                                     </div>
@@ -527,6 +555,7 @@ export default function TeacherQuizzesIndex() {
                                   {quiz.status === 'draft' && quiz.questions_count > 0 && (
                                     <button
                                       type="button"
+                                      onClick={() => handleQuizAction('activate', quiz.id)}
                                       className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                                     >
                                       <Play className="h-4 w-4 mr-1" />
@@ -536,25 +565,71 @@ export default function TeacherQuizzesIndex() {
                                   
                                   <button
                                     type="button"
+                                    onClick={() => handleQuizAction('view', quiz.id)}
                                     className="inline-flex items-center p-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                                   >
                                     <Eye className="h-4 w-4" />
                                   </button>
                                   
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center p-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </button>
+                                  {quiz.can_edit && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuizAction('edit', quiz.id)}
+                                      className="inline-flex items-center p-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </button>
+                                  )}
                                   
                                   <div className="relative">
                                     <button
                                       type="button"
+                                      onClick={() => setShowActionMenu(showActionMenu === quiz.id ? null : quiz.id)}
                                       className="inline-flex items-center p-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                                     >
                                       <MoreVertical className="h-4 w-4" />
                                     </button>
+                                    
+                                    {showActionMenu === quiz.id && (
+                                      <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                                        <div className="py-1">
+                                          {quiz.completed_attempts_count > 0 && (
+                                            <button
+                                              onClick={() => handleQuizAction('results', quiz.id)}
+                                              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                            >
+                                              <TrendingUp className="h-4 w-4 mr-2" />
+                                              View Results
+                                            </button>
+                                          )}
+                                          <button
+                                            onClick={() => handleQuizAction('duplicate', quiz.id)}
+                                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                          >
+                                            <Copy className="h-4 w-4 mr-2" />
+                                            Duplicate
+                                          </button>
+                                          {quiz.status === 'active' && (
+                                            <button
+                                              onClick={() => handleQuizAction('archive', quiz.id)}
+                                              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                            >
+                                              <Archive className="h-4 w-4 mr-2" />
+                                              Archive
+                                            </button>
+                                          )}
+                                          {quiz.attempts_count === 0 && (
+                                            <button
+                                              onClick={() => handleQuizAction('delete', quiz.id)}
+                                              className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50"
+                                            >
+                                              <Trash2 className="h-4 w-4 mr-2" />
+                                              Delete
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -567,54 +642,83 @@ export default function TeacherQuizzesIndex() {
                 </div>
 
                 {/* Pagination */}
-                <div className="mt-6 bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 rounded-lg shadow-sm">
-                  <div className="flex-1 flex justify-between sm:hidden">
-                    <button
-                      type="button"
-                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      type="button"
-                      className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                    >
-                      Next
-                    </button>
-                  </div>
-                  
-                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm text-gray-700">
-                        Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredQuizzes.length}</span> of{' '}
-                        <span className="font-medium">{filteredQuizzes.length}</span> results
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                {quizzes.data.length > 0 && (
+                  <div className="mt-6 bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 rounded-lg shadow-sm">
+                    <div className="flex-1 flex justify-between sm:hidden">
+                      {quizzes.links.find(link => link.label === 'Previous') && (
                         <button
                           type="button"
-                          className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                          onClick={() => router.visit(quizzes.links.find(link => link.label === 'Previous')?.url)}
+                          className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                          disabled={!quizzes.links.find(link => link.label === 'Previous')?.url}
                         >
                           Previous
                         </button>
+                      )}
+                      {quizzes.links.find(link => link.label === 'Next') && (
                         <button
                           type="button"
-                          className="z-10 bg-purple-50 border-purple-500 text-purple-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium"
-                        >
-                          1
-                        </button>
-                        <button
-                          type="button"
-                          className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                          onClick={() => router.visit(quizzes.links.find(link => link.label === 'Next')?.url)}
+                          className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                          disabled={!quizzes.links.find(link => link.label === 'Next')?.url}
                         >
                           Next
                         </button>
-                      </nav>
+                      )}
+                    </div>
+                    
+                    <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm text-gray-700">
+                          Showing <span className="font-medium">{quizzes.meta.from || 0}</span> to{' '}
+                          <span className="font-medium">{quizzes.meta.to || 0}</span> of{' '}
+                          <span className="font-medium">{quizzes.meta.total}</span> results
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                          {quizzes.links.map((link, index) => {
+                            if (link.label === 'Previous' || link.label === 'Next') {
+                              return (
+                                <button
+                                  key={index}
+                                  type="button"
+                                  onClick={() => link.url && router.visit(link.url)}
+                                  disabled={!link.url}
+                                  className={`relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 ${
+                                    index === 0 ? 'rounded-l-md' : ''
+                                  } ${
+                                    index === quizzes.links.length - 1 ? 'rounded-r-md' : ''
+                                  } ${
+                                    !link.url ? 'opacity-50 cursor-not-allowed' : ''
+                                  }`}
+                                >
+                                  {link.label}
+                                </button>
+                              );
+                            }
+                            
+                            return (
+                              <button
+                                key={index}
+                                type="button"
+                                onClick={() => link.url && router.visit(link.url)}
+                                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                  link.active
+                                    ? 'z-10 bg-purple-50 border-purple-500 text-purple-600'
+                                    : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                }`}
+                              >
+                                {link.label}
+                              </button>
+                            );
+                          })}
+                        </nav>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </main>
