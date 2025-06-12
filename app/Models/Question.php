@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Question extends Model
 {
@@ -13,22 +12,22 @@ class Question extends Model
 
     protected $fillable = [
         'quiz_id',
-        'type',
         'question_text',
+        'question_type',
         'options',
         'correct_answer',
-        'marks',
+        'points',
+        'explanation',
         'order',
     ];
 
     protected $casts = [
         'options' => 'array',
-        'marks' => 'integer',
-        'order' => 'integer',
+        'points' => 'integer',
     ];
 
     /**
-     * Get the quiz that owns the question
+     * Get the quiz that owns the question.
      */
     public function quiz(): BelongsTo
     {
@@ -36,72 +35,18 @@ class Question extends Model
     }
 
     /**
-     * Get the answers for this question
+     * Check if this is a multiple choice question.
      */
-    public function quizAnswers(): HasMany
+    public function isMCQ(): bool
     {
-        return $this->hasMany(QuizAnswer::class);
+        return $this->question_type === 'mcq';
     }
 
     /**
-     * Scope to get questions by type
-     */
-    public function scopeByType($query, $type)
-    {
-        return $query->where('type', $type);
-    }
-
-    /**
-     * Scope to get MCQ questions
-     */
-    public function scopeMcq($query)
-    {
-        return $query->where('type', 'mcq');
-    }
-
-    /**
-     * Scope to get short answer questions
-     */
-    public function scopeShortAnswer($query)
-    {
-        return $query->where('type', 'short_answer');
-    }
-
-    /**
-     * Scope to order questions by their order field
-     */
-    public function scopeOrdered($query)
-    {
-        return $query->orderBy('order');
-    }
-
-    /**
-     * Check if question is MCQ
-     */
-    public function isMcq(): bool
-    {
-        return $this->type === 'mcq';
-    }
-
-    /**
-     * Check if question is short answer
+     * Check if this is a short answer question.
      */
     public function isShortAnswer(): bool
     {
-        return $this->type === 'short_answer';
-    }
-
-    /**
-     * Get shuffled options for MCQ
-     */
-    public function getShuffledOptions(): array
-    {
-        if (!$this->isMcq() || !$this->options) {
-            return [];
-        }
-
-        $options = $this->options;
-        shuffle($options);
-        return $options;
+        return $this->question_type === 'short_answer';
     }
 }

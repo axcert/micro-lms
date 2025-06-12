@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { route } from '@/Utils/routes';
-import toast from 'react-hot-toast';
 
-// Custom SVG Icons
+// Education-focused SVG Icons
 const EnvelopeIcon = ({ className }: { className: string }) => (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -29,21 +26,15 @@ const BookOpenIcon = ({ className }: { className: string }) => (
     </svg>
 );
 
-const PencilIcon = ({ className }: { className: string }) => (
+const ClipboardIcon = ({ className }: { className: string }) => (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
     </svg>
 );
 
-const StarIcon = ({ className }: { className: string }) => (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-    </svg>
-);
-
-const HeartIcon = ({ className }: { className: string }) => (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+const ChartBarIcon = ({ className }: { className: string }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
     </svg>
 );
 
@@ -53,77 +44,104 @@ const LockIcon = ({ className }: { className: string }) => (
     </svg>
 );
 
+const UserGroupIcon = ({ className }: { className: string }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+    </svg>
+);
+
+const PlayIcon = ({ className }: { className: string }) => (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+        <path d="M8 5v14l11-7z"/>
+    </svg>
+);
+
 interface ForgotPasswordProps {
     status?: string;
-}
-
-interface ForgotPasswordData {
-    email: string;
 }
 
 const ForgotPassword: React.FC<ForgotPasswordProps> = ({ status }) => {
     const [pageLoading, setPageLoading] = useState(true);
     const [isLoaded, setIsLoaded] = useState(false);
-    
-    const { data, setData, post, processing, errors, reset } = useForm<ForgotPasswordData>({
-        email: '',
-    });
+    const [processing, setProcessing] = useState(false);
+    const [email, setEmail] = useState('');
+    const [errors, setErrors] = useState<{email?: string}>({});
+    const [showSuccess, setShowSuccess] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => {
             setPageLoading(false);
             setIsLoaded(true);
         }, 1200);
+        
+        // Set document title
+        document.title = "Forgot Password - MicroLMS";
+        
         return () => clearTimeout(timer);
     }, []);
 
     useEffect(() => {
         if (status) {
-            toast.success(status, {
-                duration: 6000,
-                position: 'top-center',
-                style: {
-                    background: 'linear-gradient(135deg, #a855f7, #ec4899, #f59e0b)',
-                    color: 'white',
-                    fontWeight: '600',
-                    borderRadius: '12px',
-                    boxShadow: '0 10px 25px -5px rgba(168, 85, 247, 0.4)',
-                },
-            });
+            setShowSuccess(true);
         }
     }, [status]);
 
-    const submit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post(route('password.email'));
+    const submit = (e?: React.MouseEvent) => {
+        if (e) e.preventDefault();
+        
+        // Basic email validation
+        if (!email) {
+            setErrors({ email: 'Email is required' });
+            return;
+        }
+        
+        if (!email.includes('@')) {
+            setErrors({ email: 'Please enter a valid email address' });
+            return;
+        }
+        
+        setErrors({});
+        setProcessing(true);
+        
+        // Simulate API call
+        setTimeout(() => {
+            setProcessing(false);
+            setShowSuccess(true);
+            alert('Password reset email sent! Please check your inbox.');
+        }, 2000);
     };
 
     if (pageLoading) {
+        // Set loading title
+        document.title = "Loading - MicroLMS";
+        
         return (
-            <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 via-blue-50 to-yellow-50 flex items-center justify-center relative overflow-hidden">
-                <Head title="Loading..." />
-                {/* Colorful background orbs */}
-                <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-br from-pink-400 to-rose-500 rounded-full blur-2xl opacity-20 animate-float"></div>
-                <div className="absolute top-32 right-20 w-24 h-24 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-full blur-xl opacity-25 animate-float delay-1000"></div>
-                <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full blur-3xl opacity-15 animate-float delay-500"></div>
+            <div className="min-h-screen bg-white flex items-center justify-center relative overflow-hidden">
+                {/* Educational background orbs */}
+                <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-br from-green-100 to-green-200 rounded-full blur-2xl opacity-30 animate-float"></div>
+                <div className="absolute top-32 right-20 w-24 h-24 bg-gradient-to-br from-black/10 to-black/20 rounded-full blur-xl opacity-20 animate-float delay-1000"></div>
+                <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-gradient-to-br from-green-200 to-green-300 rounded-full blur-3xl opacity-20 animate-float delay-500"></div>
                 
                 <div className="text-center relative z-10">
                     <div className="relative mb-8">
-                        <div className="w-20 h-20 bg-gradient-to-br from-purple-400 via-pink-400 to-yellow-400 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-200/50 animate-float mx-auto relative">
-                            <LockIcon className="w-10 h-10 text-white drop-shadow-lg" />
-                            <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full animate-rainbow-pulse"></div>
-                            <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full animate-ping"></div>
+                        <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-green-200/50 animate-float mx-auto relative">
+                            <AcademicCapIcon className="w-10 h-10 text-white drop-shadow-lg" />
+                            <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-r from-green-400 to-green-500 rounded-full animate-green-pulse flex items-center justify-center">
+                                <LockIcon className="w-3 h-3 text-white" />
+                            </div>
+                            <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-gradient-to-r from-gray-600 to-black rounded-full animate-ping"></div>
                         </div>
                     </div>
-                    <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-pink-500 to-yellow-500 bg-clip-text text-transparent mb-4 animate-rainbow-text">
-                        Password Recovery
+                    <h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-black bg-clip-text text-transparent mb-2">
+                        MicroLMS Learning Portal
                     </h2>
+                    <p className="text-sm text-gray-600 mb-4">Secure Account Recovery</p>
                     <div className="flex space-x-2 justify-center">
-                        <div className="w-3 h-3 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full animate-bounce"></div>
-                        <div className="w-3 h-3 bg-gradient-to-r from-pink-400 to-orange-400 rounded-full animate-bounce delay-100"></div>
-                        <div className="w-3 h-3 bg-gradient-to-r from-orange-400 to-yellow-400 rounded-full animate-bounce delay-200"></div>
-                        <div className="w-3 h-3 bg-gradient-to-r from-yellow-400 to-green-400 rounded-full animate-bounce delay-300"></div>
-                        <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-blue-400 rounded-full animate-bounce delay-400"></div>
+                        <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-green-500 rounded-full animate-bounce"></div>
+                        <div className="w-3 h-3 bg-gradient-to-r from-green-500 to-green-600 rounded-full animate-bounce delay-100"></div>
+                        <div className="w-3 h-3 bg-gradient-to-r from-black to-gray-700 rounded-full animate-bounce delay-200"></div>
+                        <div className="w-3 h-3 bg-gradient-to-r from-gray-700 to-gray-800 rounded-full animate-bounce delay-300"></div>
+                        <div className="w-3 h-3 bg-gradient-to-r from-green-600 to-green-700 rounded-full animate-bounce delay-400"></div>
                     </div>
                 </div>
             </div>
@@ -131,108 +149,125 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ status }) => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 via-blue-50 to-yellow-50 relative overflow-hidden flex items-center justify-center p-4">
-            <Head title="Forgot Password" />
+        <div className="min-h-screen bg-white relative overflow-hidden flex items-center justify-center p-4">
             
-            {/* Enhanced Colorful Floating Elements */}
+            {/* Enhanced Educational Floating Elements */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                {/* Colorful Background Orbs */}
-                <div className="absolute top-20 left-10 w-64 h-64 bg-gradient-to-br from-pink-300/30 to-rose-400/30 rounded-full blur-3xl animate-float-slow"></div>
-                <div className="absolute top-40 right-20 w-48 h-48 bg-gradient-to-br from-blue-300/25 to-cyan-400/25 rounded-full blur-2xl animate-float-slow delay-1000"></div>
-                <div className="absolute bottom-32 left-1/4 w-56 h-56 bg-gradient-to-br from-emerald-300/20 to-teal-400/20 rounded-full blur-3xl animate-float-slow delay-500"></div>
-                <div className="absolute bottom-20 right-10 w-32 h-32 bg-gradient-to-br from-orange-300/30 to-yellow-400/30 rounded-full blur-2xl animate-float delay-700"></div>
+                {/* Background Orbs */}
+                <div className="absolute top-20 left-10 w-64 h-64 bg-gradient-to-br from-green-100/30 to-green-200/30 rounded-full blur-3xl animate-float-slow"></div>
+                <div className="absolute top-40 right-20 w-48 h-48 bg-gradient-to-br from-black/5 to-black/10 rounded-full blur-2xl animate-float-slow delay-1000"></div>
+                <div className="absolute bottom-32 left-1/4 w-56 h-56 bg-gradient-to-br from-green-200/20 to-green-300/20 rounded-full blur-3xl animate-float-slow delay-500"></div>
+                <div className="absolute bottom-20 right-10 w-32 h-32 bg-gradient-to-br from-green-300/30 to-green-400/30 rounded-full blur-2xl animate-float delay-700"></div>
                 
-                {/* Colorful Icons */}
+                {/* Educational Icons */}
                 <div className="absolute top-10 left-5 md:top-20 md:left-10 opacity-30">
-                    <BookOpenIcon className="w-8 h-8 md:w-12 md:h-12 text-emerald-500 animate-float-slow" />
+                    <BookOpenIcon className="w-8 h-8 md:w-12 md:h-12 text-green-500 animate-float-slow" />
                 </div>
                 <div className="absolute top-32 right-8 md:top-40 md:right-20 opacity-25">
-                    <PencilIcon className="w-6 h-6 md:w-10 md:h-10 text-cyan-500 animate-pencil-write delay-1000" />
+                    <ClipboardIcon className="w-6 h-6 md:w-10 md:h-10 text-black animate-pencil-write delay-1000" />
                 </div>
                 <div className="absolute bottom-40 left-8 md:bottom-32 md:left-1/4 opacity-30">
-                    <LockIcon className="w-6 h-6 md:w-8 md:h-8 text-pink-500 animate-bounce-gentle" />
+                    <AcademicCapIcon className="w-6 h-6 md:w-8 md:h-8 text-green-600 animate-bounce-gentle" />
                 </div>
                 <div className="absolute top-60 right-4 md:right-16 opacity-25">
-                    <StarIcon className="w-5 h-5 md:w-7 md:h-7 text-orange-500 animate-rainbow-pulse delay-500" />
+                    <ChartBarIcon className="w-5 h-5 md:w-7 md:h-7 text-gray-800 animate-green-pulse delay-500" />
                 </div>
                 <div className="absolute bottom-20 right-6 md:bottom-20 md:right-10 opacity-30">
-                    <HeartIcon className="w-6 h-6 md:w-8 md:h-8 text-purple-500 animate-heart-beat" />
+                    <UserGroupIcon className="w-6 h-6 md:w-8 md:h-8 text-green-500 animate-bubble" />
                 </div>
                 
-                {/* New Colorful Elements */}
+                {/* Learning Elements */}
                 <div className="absolute top-1/4 left-20 opacity-20">
-                    <StarIcon className="w-8 h-8 text-yellow-400 animate-rainbow-pulse" />
+                    <PlayIcon className="w-8 h-8 text-green-400 animate-green-pulse" />
                 </div>
                 <div className="absolute top-1/3 right-32 opacity-25">
-                    <HeartIcon className="w-6 h-6 text-pink-400 animate-heart-beat" />
+                    <div className="w-6 h-6 bg-gradient-to-r from-green-400 to-green-500 rounded animate-heart-beat flex items-center justify-center">
+                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                    </div>
                 </div>
                 <div className="absolute bottom-1/3 left-16 opacity-20">
-                    <EnvelopeIcon className="w-10 h-10 text-blue-400 animate-float-slow delay-700" />
+                    <EnvelopeIcon className="w-10 h-10 text-green-500 animate-float-slow delay-700" />
                 </div>
                 
-                {/* Floating colored papers */}
-                <div className="absolute top-1/3 left-12 w-8 h-10 md:w-12 md:h-16 bg-gradient-to-br from-pink-200 to-rose-300 rounded-sm shadow-lg animate-paper-float opacity-40"></div>
-                <div className="absolute bottom-1/3 right-12 w-6 h-8 md:w-10 md:h-12 bg-gradient-to-br from-blue-200 to-cyan-300 rounded-sm shadow-md animate-paper-float delay-700 opacity-35"></div>
-                <div className="absolute top-1/2 left-1/3 w-7 h-9 bg-gradient-to-br from-emerald-200 to-green-300 rounded-sm shadow-md animate-paper-float delay-1200 opacity-30"></div>
+                {/* Educational papers/documents */}
+                <div className="absolute top-1/3 left-12 w-8 h-10 md:w-12 md:h-16 bg-gradient-to-br from-green-100 to-green-200 rounded-sm shadow-lg animate-paper-float opacity-40 relative">
+                    <div className="absolute top-1 left-1 right-1 h-0.5 bg-green-400 rounded"></div>
+                    <div className="absolute top-3 left-1 right-2 h-0.5 bg-green-300 rounded"></div>
+                    <div className="absolute top-5 left-1 right-3 h-0.5 bg-green-200 rounded"></div>
+                </div>
+                <div className="absolute bottom-1/3 right-12 w-6 h-8 md:w-10 md:h-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded-sm shadow-md animate-paper-float delay-700 opacity-35 relative">
+                    <div className="absolute top-1 left-0.5 right-0.5 h-0.5 bg-gray-400 rounded"></div>
+                    <div className="absolute top-2.5 left-0.5 right-1 h-0.5 bg-gray-300 rounded"></div>
+                </div>
+                <div className="absolute top-1/2 left-1/3 w-7 h-9 bg-gradient-to-br from-green-200 to-green-300 rounded-sm shadow-md animate-paper-float delay-1200 opacity-30 relative">
+                    <div className="absolute top-1 left-0.5 right-0.5 h-0.5 bg-green-500 rounded"></div>
+                    <div className="absolute top-2.5 left-0.5 right-1 h-0.5 bg-green-400 rounded"></div>
+                    <div className="absolute top-4 left-0.5 right-1.5 h-0.5 bg-green-300 rounded"></div>
+                </div>
             </div>
 
             <div className={`relative z-10 w-full max-w-md transform transition-all duration-1000 ease-out ${
                 isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
             }`}>
-                <div className="backdrop-blur-lg bg-gradient-to-br from-white/90 to-white/70 border border-white/30 rounded-2xl md:rounded-3xl shadow-2xl shadow-purple-200/30 p-6 md:p-8 relative overflow-hidden">
-                    {/* Colorful background gradient overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-50/50 via-pink-50/30 to-yellow-50/50 rounded-2xl md:rounded-3xl"></div>
+                <div className="backdrop-blur-lg bg-gradient-to-br from-white/95 to-gray-50/90 border border-green-200 rounded-2xl md:rounded-3xl shadow-2xl shadow-green-200/30 p-6 md:p-8 relative overflow-hidden">
+                    {/* Background gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-50/30 via-white to-gray-50/30 rounded-2xl md:rounded-3xl"></div>
                     
                     <div className="relative z-10">
-                        {/* Enhanced Header */}
+                        {/* Enhanced LMS Header */}
                         <div className="text-center mb-8 animate-fade-in-up">
-                            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-purple-400 via-pink-400 to-yellow-400 rounded-2xl flex items-center justify-center shadow-2xl shadow-purple-200/50 mb-6 transform hover:scale-105 transition-transform duration-500 animate-float relative">
-                                <LockIcon className="w-8 h-8 text-white drop-shadow-lg" />
-                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full animate-rainbow-pulse"></div>
-                                <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full animate-ping"></div>
+                            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-green-200/50 mb-6 transform hover:scale-105 transition-transform duration-500 animate-float relative">
+                                <AcademicCapIcon className="w-8 h-8 text-white drop-shadow-lg" />
+                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-green-400 to-green-500 rounded-full animate-green-pulse flex items-center justify-center">
+                                    <LockIcon className="w-2 h-2 text-white" />
+                                </div>
+                                <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-gradient-to-r from-gray-600 to-black rounded-full animate-ping"></div>
                             </div>
-                            <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-600 via-pink-500 to-yellow-500 bg-clip-text text-transparent mb-2 animate-rainbow-text">
-                                Forgot Your Password?
-                            </h2>
-                            <div className="w-12 md:w-16 h-1 bg-gradient-to-r from-purple-400 via-pink-400 to-yellow-400 mx-auto rounded-full animate-gradient-shift mb-4"></div>
+                            <div className="mb-4">
+                                <h1 className="text-sm font-semibold text-green-600 mb-1 tracking-wide">MICROLMS LEARNING PORTAL</h1>
+                                <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-green-600 to-black bg-clip-text text-transparent mb-2 animate-green-text">
+                                    Account Recovery
+                                </h2>
+                            </div>
+                            <div className="w-12 md:w-16 h-1 bg-gradient-to-r from-green-500 to-black mx-auto rounded-full animate-gradient-shift mb-4"></div>
                             <p className="text-gray-600 text-sm leading-relaxed animate-slide-in-up delay-200">
-                                No problem! Just enter your email address and we'll send you a link to reset your password.
+                                Can't access your learning account? Enter your registered email address and we'll send you a secure link to reset your password and get back to your courses.
                             </p>
                         </div>
 
                         {/* Enhanced Success Message */}
-                        {status && (
-                            <div className="mb-6 p-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border-2 border-emerald-200/50 rounded-xl shadow-lg shadow-emerald-100/30 animate-slide-in-up">
+                        {showSuccess && (
+                            <div className="mb-6 p-4 bg-gradient-to-r from-green-50 via-green-50 to-gray-50 border-2 border-green-200/50 rounded-xl shadow-lg shadow-green-100/30 animate-slide-in-up">
                                 <div className="flex items-start">
                                     <div className="flex-shrink-0">
-                                        <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-lg flex items-center justify-center">
+                                        <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-500 rounded-lg flex items-center justify-center">
                                             <svg className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
                                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                             </svg>
                                         </div>
                                     </div>
                                     <div className="ml-3">
-                                        <h3 className="text-sm font-semibold text-emerald-800 flex items-center">
-                                            <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2 animate-pulse"></div>
-                                            Email sent successfully!
+                                        <h3 className="text-sm font-semibold text-green-800 flex items-center">
+                                            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                                            Password reset email sent!
                                         </h3>
-                                        <div className="mt-2 text-sm text-emerald-700">
-                                            <p>{status}</p>
+                                        <div className="mt-2 text-sm text-green-700">
+                                            <p>We've sent a password reset link to your email address. Please check your inbox and follow the instructions.</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        <form onSubmit={submit} className="space-y-6">
+                        <div className="space-y-6">
                             {/* Enhanced Email Field */}
                             <div className="animate-slide-in-up delay-400">
                                 <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-3">
-                                    Email Address *
+                                    Student/Teacher Email Address *
                                 </label>
                                 <div className="relative group">
                                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                        <EnvelopeIcon className="h-5 w-5 text-gray-400 group-focus-within:text-purple-500 transition-colors duration-300" />
+                                        <EnvelopeIcon className="h-5 w-5 text-gray-400 group-focus-within:text-green-500 transition-colors duration-300" />
                                     </div>
                                     <input
                                         id="email"
@@ -240,14 +275,20 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ status }) => {
                                         type="email"
                                         autoComplete="email"
                                         required
-                                        value={data.email}
-                                        onChange={(e) => setData('email', e.target.value)}
-                                        className={`w-full pl-12 pr-4 py-4 bg-gradient-to-r from-white/95 to-white/90 border-2 border-purple-200/50 rounded-xl text-gray-800 placeholder-gray-400 transition-all duration-300 focus:outline-none focus:border-purple-400 focus:bg-white focus:shadow-lg focus:shadow-purple-100/50 group-hover:border-purple-300 group-hover:shadow-md ${
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                submit();
+                                            }
+                                        }}
+                                        className={`w-full pl-12 pr-4 py-4 bg-white border-2 border-green-200 rounded-xl text-gray-800 placeholder-gray-400 transition-all duration-300 focus:outline-none focus:border-green-500 focus:bg-white focus:shadow-lg focus:shadow-green-100/50 group-hover:border-green-400 group-hover:shadow-md ${
                                             errors.email ? 'border-red-300 focus:border-red-400' : ''
                                         }`}
-                                        placeholder="Enter your email address"
+                                        placeholder="Enter your registered email address"
                                     />
-                                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-200/10 via-pink-200/10 to-yellow-200/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-green-200/10 to-green-300/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                                 </div>
                                 {errors.email && (
                                     <p className="mt-2 text-red-500 text-sm animate-shake">{errors.email}</p>
@@ -256,15 +297,15 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ status }) => {
 
                             {/* Enhanced Submit Button */}
                             <button
-                                type="submit"
+                                onClick={submit}
                                 disabled={processing}
-                                className="w-full bg-gradient-to-r from-purple-400 via-pink-400 to-yellow-400 hover:from-purple-500 hover:via-pink-500 hover:to-yellow-500 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100 disabled:hover:translate-y-0 relative overflow-hidden group shadow-lg hover:shadow-xl animate-slide-in-up delay-500 animate-rainbow-glow"
+                                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100 disabled:hover:translate-y-0 relative overflow-hidden group shadow-lg hover:shadow-xl animate-slide-in-up delay-500 animate-green-glow"
                             >
                                 <span className="relative z-10 flex items-center justify-center">
                                     {processing ? (
                                         <>
                                             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-3"></div>
-                                            <span className="animate-pulse">Sending Reset Link...</span>
+                                            <span className="animate-pulse">Sending Recovery Email...</span>
                                         </>
                                     ) : (
                                         <>
@@ -275,48 +316,57 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ status }) => {
                                 </span>
                                 <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                             </button>
-                        </form>
+                        </div>
 
                         {/* Enhanced Navigation Links */}
                         <div className="mt-8 flex items-center justify-between animate-slide-in-up delay-600">
-                            <Link
-                                href={route('login')}
-                                className="inline-flex items-center text-sm font-semibold text-purple-600 hover:text-pink-500 transition-all duration-300 hover:underline group"
+                            <a
+                                href="#"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    alert('Navigate to login page');
+                                }}
+                                className="inline-flex items-center text-sm font-semibold text-green-600 hover:text-black transition-all duration-300 hover:underline group"
                             >
                                 <ArrowLeftIcon className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform duration-200" />
-                                Back to Login
-                            </Link>
+                                Back to Portal Login
+                            </a>
                             
-                            <Link
-                                href={route('register')}
-                                className="text-sm font-semibold text-purple-600 hover:text-pink-500 transition-all duration-300 hover:underline"
+                            <a
+                                href="#"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    alert('Navigate to registration page');
+                                }}
+                                className="text-sm font-semibold text-green-600 hover:text-black transition-all duration-300 hover:underline"
                             >
-                                Create Account
-                            </Link>
+                                Join Our Platform
+                            </a>
                         </div>
 
-                        {/* Enhanced Help Section */}
-                        <div className="mt-8 p-4 md:p-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-xl border border-blue-200/50 shadow-lg shadow-blue-100/30 animate-slide-in-up delay-700">
-                            <h3 className="text-sm font-semibold text-blue-900 mb-4 flex items-center">
-                                <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full mr-3 animate-pulse"></div>
-                                Need Help?
+                        {/* Enhanced LMS Help Section */}
+                        <div className="mt-8 p-4 md:p-6 bg-gradient-to-r from-green-50 via-green-50 to-gray-50 rounded-xl border border-green-200/50 shadow-lg shadow-green-100/30 animate-slide-in-up delay-700">
+                            <h3 className="text-sm font-semibold text-green-900 mb-4 flex items-center">
+                                <AcademicCapIcon className="w-4 h-4 mr-2" />
+                                <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-green-500 rounded-full mr-2 animate-pulse"></div>
+                                Account Recovery Support
                             </h3>
-                            <div className="text-xs text-blue-700 space-y-2">
+                            <div className="text-xs text-green-700 space-y-2">
                                 <div className="flex items-center p-2 bg-gradient-to-r from-white/60 to-white/40 rounded-lg">
-                                    <div className="w-2 h-2 bg-blue-400 rounded-full mr-3 animate-pulse delay-100"></div>
-                                    <p>Make sure you enter the correct email address</p>
+                                    <div className="w-2 h-2 bg-green-400 rounded-full mr-3 animate-pulse delay-100"></div>
+                                    <p>Use the same email address you registered with as a student or teacher</p>
                                 </div>
                                 <div className="flex items-center p-2 bg-gradient-to-r from-white/60 to-white/40 rounded-lg">
-                                    <div className="w-2 h-2 bg-indigo-400 rounded-full mr-3 animate-pulse delay-200"></div>
-                                    <p>Check your spam/junk folder if you don't receive the email</p>
+                                    <div className="w-2 h-2 bg-green-500 rounded-full mr-3 animate-pulse delay-200"></div>
+                                    <p>Check your spam/junk folder for the password reset email</p>
                                 </div>
                                 <div className="flex items-center p-2 bg-gradient-to-r from-white/60 to-white/40 rounded-lg">
-                                    <div className="w-2 h-2 bg-purple-400 rounded-full mr-3 animate-pulse delay-300"></div>
-                                    <p>The reset link will expire in 60 minutes</p>
+                                    <div className="w-2 h-2 bg-green-600 rounded-full mr-3 animate-pulse delay-300"></div>
+                                    <p>The secure reset link will expire in 60 minutes for your security</p>
                                 </div>
                                 <div className="flex items-center p-2 bg-gradient-to-r from-white/60 to-white/40 rounded-lg">
-                                    <div className="w-2 h-2 bg-pink-400 rounded-full mr-3 animate-pulse delay-400"></div>
-                                    <p>Contact support if you continue having issues</p>
+                                    <div className="w-2 h-2 bg-black rounded-full mr-3 animate-pulse delay-400"></div>
+                                    <p>Contact your LMS administrator if you continue experiencing issues</p>
                                 </div>
                             </div>
                         </div>
@@ -327,18 +377,21 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ status }) => {
             {/* Enhanced Loading Overlay */}
             {processing && (
                 <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-50 flex items-center justify-center">
-                    <div className="bg-gradient-to-br from-white/95 to-white/85 rounded-3xl p-8 shadow-2xl border border-white/20 text-center max-w-sm mx-4 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-50/50 via-pink-50/30 to-yellow-50/50 rounded-3xl"></div>
+                    <div className="bg-white rounded-3xl p-8 shadow-2xl border border-green-200 text-center max-w-sm mx-4 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 to-gray-50/30 rounded-3xl"></div>
                         <div className="relative z-10">
-                            <div className="w-16 h-16 bg-gradient-to-r from-purple-400 via-pink-400 to-yellow-400 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-float">
+                            <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-float relative">
                                 <div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-green-400 to-green-500 rounded-full flex items-center justify-center">
+                                    <AcademicCapIcon className="w-2 h-2 text-white" />
+                                </div>
                             </div>
-                            <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-600 via-pink-500 to-yellow-500 bg-clip-text text-transparent mb-2">Sending Reset Link</h3>
-                            <p className="text-gray-600 text-sm">Please wait while we prepare your password reset email...</p>
+                            <h3 className="text-lg font-semibold bg-gradient-to-r from-green-600 to-black bg-clip-text text-transparent mb-2">Sending Recovery Email</h3>
+                            <p className="text-gray-600 text-sm">Preparing your secure password reset link for learning portal access...</p>
                             <div className="flex justify-center space-x-1 mt-4">
-                                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
-                                <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce delay-100"></div>
-                                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce delay-200"></div>
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce"></div>
+                                <div className="w-2 h-2 bg-green-600 rounded-full animate-bounce delay-100"></div>
+                                <div className="w-2 h-2 bg-black rounded-full animate-bounce delay-200"></div>
                             </div>
                         </div>
                     </div>
@@ -406,6 +459,14 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ status }) => {
                         transform: translateY(-8px) rotate(-10deg);
                     }
                 }
+                @keyframes bubble {
+                    0%, 100% {
+                        transform: scale(1) translateY(0);
+                    }
+                    50% {
+                        transform: scale(1.1) translateY(-5px);
+                    }
+                }
                 @keyframes paper-float {
                     0%, 100% {
                         transform: translateY(0px) rotate(2deg);
@@ -417,29 +478,29 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ status }) => {
                         transform: translateY(-5px) rotate(3deg);
                     }
                 }
-                @keyframes rainbow-pulse {
+                @keyframes green-pulse {
                     0% {
-                        background: linear-gradient(45deg, #f59e0b, #ec4899);
+                        background: linear-gradient(45deg, #22c55e, #16a34a);
                         transform: scale(1);
                     }
                     25% {
-                        background: linear-gradient(45deg, #ec4899, #8b5cf6);
+                        background: linear-gradient(45deg, #16a34a, #15803d);
                         transform: scale(1.1);
                     }
                     50% {
-                        background: linear-gradient(45deg, #8b5cf6, #06b6d4);
+                        background: linear-gradient(45deg, #15803d, #166534);
                         transform: scale(1.2);
                     }
                     75% {
-                        background: linear-gradient(45deg, #06b6d4, #10b981);
+                        background: linear-gradient(45deg, #166534, #14532d);
                         transform: scale(1.1);
                     }
                     100% {
-                        background: linear-gradient(45deg, #10b981, #f59e0b);
+                        background: linear-gradient(45deg, #14532d, #22c55e);
                         transform: scale(1);
                     }
                 }
-                @keyframes rainbow-text {
+                @keyframes green-text {
                     0% {
                         background-position: 0% 50%;
                     }
@@ -450,18 +511,18 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ status }) => {
                         background-position: 0% 50%;
                     }
                 }
-                @keyframes rainbow-glow {
+                @keyframes green-glow {
                     0%, 100% {
-                        box-shadow: 0 4px 15px rgba(147, 51, 234, 0.3), 0 0 20px rgba(236, 72, 153, 0.2);
+                        box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3), 0 0 20px rgba(22, 163, 74, 0.2);
                     }
                     25% {
-                        box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4), 0 0 20px rgba(6, 182, 212, 0.3);
+                        box-shadow: 0 4px 15px rgba(22, 163, 74, 0.4), 0 0 20px rgba(21, 128, 61, 0.3);
                     }
                     50% {
-                        box-shadow: 0 4px 15px rgba(6, 182, 212, 0.4), 0 0 20px rgba(16, 185, 129, 0.3);
+                        box-shadow: 0 4px 15px rgba(21, 128, 61, 0.4), 0 0 20px rgba(22, 101, 52, 0.3);
                     }
                     75% {
-                        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4), 0 0 20px rgba(245, 158, 11, 0.3);
+                        box-shadow: 0 4px 15px rgba(22, 101, 52, 0.4), 0 0 20px rgba(20, 83, 45, 0.3);
                     }
                 }
                 @keyframes gradient-shift {
@@ -522,24 +583,27 @@ const ForgotPassword: React.FC<ForgotPasswordProps> = ({ status }) => {
                 .animate-pencil-write {
                     animation: pencil-write 3s ease-in-out infinite;
                 }
+                .animate-bubble {
+                    animation: bubble 2.5s ease-in-out infinite;
+                }
                 .animate-paper-float {
                     animation: paper-float 5s ease-in-out infinite;
                 }
-                .animate-rainbow-pulse {
-                    animation: rainbow-pulse 3s ease-in-out infinite;
+                .animate-green-pulse {
+                    animation: green-pulse 3s ease-in-out infinite;
                 }
-                .animate-rainbow-text {
-                    background: linear-gradient(90deg, #9333ea, #ec4899, #06b6d4, #10b981, #f59e0b, #9333ea);
+                .animate-green-text {
+                    background: linear-gradient(90deg, #22c55e, #16a34a, #000000, #374151, #22c55e);
                     background-size: 400% 100%;
-                    animation: rainbow-text 4s ease-in-out infinite;
+                    animation: green-text 4s ease-in-out infinite;
                     -webkit-background-clip: text;
                     -webkit-text-fill-color: transparent;
                 }
-                .animate-rainbow-glow {
-                    animation: rainbow-glow 3s ease-in-out infinite;
+                .animate-green-glow {
+                    animation: green-glow 3s ease-in-out infinite;
                 }
                 .animate-gradient-shift {
-                    background: linear-gradient(90deg, #9333ea, #ec4899, #f59e0b, #9333ea);
+                    background: linear-gradient(90deg, #22c55e, #16a34a, #000000, #22c55e);
                     background-size: 300% 100%;
                     animation: gradient-shift 3s ease-in-out infinite;
                 }

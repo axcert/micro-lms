@@ -21,7 +21,14 @@ class TeacherDashboardController extends Controller
             ->withCount('students')
             ->latest()
             ->take(5)
-            ->get();
+            ->get()
+            ->map(function ($batch) {
+                return [
+                    'id' => $batch->id,
+                    'name' => $batch->name,
+                    'students_count' => $batch->students_count,
+                ];
+            });
 
         // Get upcoming lessons for teacher's batches
         $upcomingClasses = Lesson::whereHas('batch', function ($query) use ($teacher) {
@@ -31,7 +38,17 @@ class TeacherDashboardController extends Controller
             ->with(['batch'])
             ->orderBy('scheduled_at')
             ->take(5)
-            ->get();
+            ->get()
+            ->map(function ($lesson) {
+                return [
+                    'id' => $lesson->id,
+                    'title' => $lesson->title ?? $lesson->name, // Use title if available, fallback to name
+                    'scheduled_at' => $lesson->scheduled_at,
+                    'batch' => [
+                        'name' => $lesson->batch->name,
+                    ],
+                ];
+            });
 
         // Get recent quizzes for teacher's batches
         $recentQuizzes = Quiz::whereHas('batch', function ($query) use ($teacher) {
@@ -41,9 +58,24 @@ class TeacherDashboardController extends Controller
             ->with(['batch'])
             ->latest()
             ->take(5)
-            ->get();
+            ->get()
+            ->map(function ($quiz) {
+                return [
+                    'id' => $quiz->id,
+                    'title' => $quiz->title,
+                    'attempts_count' => $quiz->attempts_count,
+                    'batch' => [
+                        'name' => $quiz->batch->name,
+                    ],
+                ];
+            });
 
         return Inertia::render('Teacher/Dashboard', [
+            // Add user data with role
+            'user' => [
+                'name' => $teacher->name,
+                'role' => 'teacher',
+            ],
             'myBatches' => $myBatches,
             'upcomingClasses' => $upcomingClasses,
             'recentQuizzes' => $recentQuizzes,
@@ -59,6 +91,10 @@ class TeacherDashboardController extends Controller
             ->paginate(15);
 
         return Inertia::render('Teacher/Batches/Index', [
+            'user' => [
+                'name' => $teacher->name,
+                'role' => 'teacher',
+            ],
             'batches' => $batches,
         ]);
     }
@@ -75,6 +111,10 @@ class TeacherDashboardController extends Controller
             ->paginate(15);
 
         return Inertia::render('Teacher/Classes/Index', [
+            'user' => [
+                'name' => $teacher->name,
+                'role' => 'teacher',
+            ],
             'classes' => $classes,
         ]);
     }
@@ -92,12 +132,23 @@ class TeacherDashboardController extends Controller
             ->paginate(15);
 
         return Inertia::render('Teacher/Quizzes/Index', [
+            'user' => [
+                'name' => $teacher->name,
+                'role' => 'teacher',
+            ],
             'quizzes' => $quizzes,
         ]);
     }
 
     public function reports(): Response
     {
-        return Inertia::render('Teacher/Reports/Index');
+        $teacher = Auth::user();
+        
+        return Inertia::render('Teacher/Reports/Index', [
+            'user' => [
+                'name' => $teacher->name,
+                'role' => 'teacher',
+            ],
+        ]);
     }
 }

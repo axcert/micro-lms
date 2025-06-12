@@ -1,8 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
-import GuestLayout from '@/Layouts/GuestLayout';
-import { route } from '@/Utils/routes';
-import toast from 'react-hot-toast';
 
 // Custom SVG Icons
 const EyeIcon = ({ className }: { className: string }) => (
@@ -32,27 +28,33 @@ const BookOpenIcon = ({ className }: { className: string }) => (
     </svg>
 );
 
-const PencilIcon = ({ className }: { className: string }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-    </svg>
-);
-
-const UserIcon = ({ className }: { className: string }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-    </svg>
-);
-
 const UsersIcon = ({ className }: { className: string }) => (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a4 4 0 11-8 0 4 4 0 018 0z" />
     </svg>
 );
 
-const ShieldCheckIcon = ({ className }: { className: string }) => (
+const CalendarIcon = ({ className }: { className: string }) => (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+);
+
+const CreditCardIcon = ({ className }: { className: string }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+    </svg>
+);
+
+const UploadIcon = ({ className }: { className: string }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+    </svg>
+);
+
+const UserPlusIcon = ({ className }: { className: string }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
     </svg>
 );
 
@@ -68,19 +70,26 @@ const HeartIcon = ({ className }: { className: string }) => (
     </svg>
 );
 
-const UserPlusIcon = ({ className }: { className: string }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-    </svg>
-);
-
 interface RegisterData {
     name: string;
     email: string;
     phone: string;
     password: string;
     password_confirmation: string;
-    role: string;
+    batch_id: string;
+    class_id: string;
+    bank_slip: File | null;
+}
+
+interface FormErrors {
+    name?: string;
+    email?: string;
+    phone?: string;
+    password?: string;
+    password_confirmation?: string;
+    batch_id?: string;
+    class_id?: string;
+    bank_slip?: string;
 }
 
 const Register: React.FC = () => {
@@ -88,15 +97,85 @@ const Register: React.FC = () => {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [pageLoading, setPageLoading] = useState(true);
     const [isLoaded, setIsLoaded] = useState(false);
+    const [dragActive, setDragActive] = useState(false);
+    const [selectedBatch, setSelectedBatch] = useState<any>(null);
+    const [processing, setProcessing] = useState(false);
     
-    const { data, setData, post, processing, errors, reset } = useForm<RegisterData>({
+    // Form data state
+    const [data, setData] = useState<RegisterData>({
         name: '',
         email: '',
         phone: '',
         password: '',
         password_confirmation: '',
-        role: 'student',
+        batch_id: '',
+        class_id: '',
+        bank_slip: null,
     });
+
+    // Form errors state
+    const [errors, setErrors] = useState<FormErrors>({});
+
+    // Helper function to update form data
+    const updateData = (field: keyof RegisterData, value: string | File | null) => {
+        setData(prev => ({ ...prev, [field]: value }));
+        // Clear error when user starts typing
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: undefined }));
+        }
+    };
+
+    // Mock data - replace with actual API calls
+    const batches = [
+        {
+            id: '1',
+            name: 'Grade 12 - Mathematics',
+            description: 'Advanced Mathematics for A/L students',
+            fee: 'LKR 8,000/month',
+            teacher: 'Mr. Perera',
+            schedule: 'Mon, Wed, Fri - 4:00 PM',
+            duration: '1.5 hours per session',
+            students: 25,
+            maxStudents: 30
+        },
+        {
+            id: '2',
+            name: 'Grade 11 - Physics',
+            description: 'Comprehensive Physics course',
+            fee: 'LKR 7,500/month',
+            teacher: 'Mrs. Silva',
+            schedule: 'Tue, Thu, Sat - 5:00 PM',
+            duration: '1.5 hours per session',
+            students: 18,
+            maxStudents: 25
+        },
+        {
+            id: '3',
+            name: 'Grade 10 - Chemistry',
+            description: 'Foundation Chemistry course',
+            fee: 'LKR 6,500/month',
+            teacher: 'Dr. Fernando',
+            schedule: 'Mon, Wed - 6:00 PM',
+            duration: '1 hour per session',
+            students: 22,
+            maxStudents: 30
+        }
+    ];
+
+    const classes = selectedBatch ? [
+        {
+            id: '1',
+            name: 'Regular Class',
+            description: 'Standard curriculum coverage',
+            fee: selectedBatch.fee,
+        },
+        {
+            id: '2',
+            name: 'Intensive Class',
+            description: 'Fast-track with extra practice',
+            fee: `LKR ${parseInt(selectedBatch.fee.replace(/[^\d]/g, '')) + 2000}/month`,
+        }
+    ] : [];
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -105,74 +184,141 @@ const Register: React.FC = () => {
         }, 1200);
         return () => {
             clearTimeout(timer);
-            reset('password', 'password_confirmation');
         };
     }, []);
 
-    const submit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post(route('register'));
+    // Form validation
+    const validateForm = (): boolean => {
+        const newErrors: FormErrors = {};
+
+        if (!data.name.trim()) {
+            newErrors.name = 'Name is required';
+        }
+
+        if (!data.email.trim()) {
+            newErrors.email = 'Email is required';
+        } else if (!/\S+@\S+\.\S+/.test(data.email)) {
+            newErrors.email = 'Email is invalid';
+        }
+
+        if (!data.phone.trim()) {
+            newErrors.phone = 'Phone number is required';
+        }
+
+        if (!data.batch_id) {
+            newErrors.batch_id = 'Please select a batch';
+        }
+
+        if (!data.class_id) {
+            newErrors.class_id = 'Please select a class type';
+        }
+
+        if (!data.bank_slip) {
+            newErrors.bank_slip = 'Please upload your payment slip';
+        }
+
+        if (!data.password) {
+            newErrors.password = 'Password is required';
+        } else if (data.password.length < 8) {
+            newErrors.password = 'Password must be at least 8 characters';
+        }
+
+        if (!data.password_confirmation) {
+            newErrors.password_confirmation = 'Please confirm your password';
+        } else if (data.password !== data.password_confirmation) {
+            newErrors.password_confirmation = 'Passwords do not match';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
     };
 
-    const roles = [
-        {
-            value: 'student',
-            label: 'Student',
-            description: 'Access classes, take quizzes, view results',
-            icon: UserIcon,
-            gradient: 'from-emerald-100 to-teal-100',
-            hoverGradient: 'hover:from-emerald-200 hover:to-teal-200',
-            textColor: 'text-emerald-600',
-            bgGradient: 'from-emerald-50 via-teal-50 to-cyan-50'
-        },
-        {
-            value: 'teacher',
-            label: 'Teacher',
-            description: 'Manage batches, create quizzes, track progress',
-            icon: UsersIcon,
-            gradient: 'from-blue-100 to-cyan-100',
-            hoverGradient: 'hover:from-blue-200 hover:to-cyan-200',
-            textColor: 'text-blue-600',
-            bgGradient: 'from-blue-50 via-cyan-50 to-indigo-50'
-        },
-        {
-            value: 'admin',
-            label: 'Administrator',
-            description: 'Full system access and user management',
-            icon: ShieldCheckIcon,
-            gradient: 'from-purple-100 to-pink-100',
-            hoverGradient: 'hover:from-purple-200 hover:to-pink-200',
-            textColor: 'text-purple-600',
-            bgGradient: 'from-purple-50 via-pink-50 to-indigo-50'
+    const submit = async () => {
+        if (!validateForm()) {
+            return;
         }
-    ];
+
+        setProcessing(true);
+        
+        // Simulate API call
+        try {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            alert('Registration successful! Welcome to Micro LMS.');
+            // In a real app, you would redirect to login or dashboard
+        } catch (error) {
+            alert('Registration failed. Please try again.');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleDrag = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'dragenter' || e.type === 'dragover') {
+            setDragActive(true);
+        } else if (e.type === 'dragleave') {
+            setDragActive(false);
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+        
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            const file = e.dataTransfer.files[0];
+            if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+                updateData('bank_slip', file);
+            } else {
+                alert('Please upload an image or PDF file');
+            }
+        }
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+                updateData('bank_slip', file);
+            } else {
+                alert('Please upload an image or PDF file');
+            }
+        }
+    };
+
+    const handleBatchSelect = (batch: any) => {
+        setSelectedBatch(batch);
+        updateData('batch_id', batch.id);
+        updateData('class_id', ''); // Reset class selection when batch changes
+    };
 
     if (pageLoading) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 via-blue-50 to-yellow-50 flex items-center justify-center relative overflow-hidden">
-                <Head title="Loading..." />
-                {/* Colorful background orbs */}
-                <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-br from-pink-400 to-rose-500 rounded-full blur-2xl opacity-20 animate-float"></div>
-                <div className="absolute top-32 right-20 w-24 h-24 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-full blur-xl opacity-25 animate-float delay-1000"></div>
-                <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full blur-3xl opacity-15 animate-float delay-500"></div>
+            <div className="min-h-screen bg-white flex items-center justify-center relative overflow-hidden">
+                {/* Background orbs */}
+                <div className="absolute top-10 left-10 w-32 h-32 bg-gradient-to-br from-green-100 to-green-200 rounded-full blur-2xl opacity-30 animate-float"></div>
+                <div className="absolute top-32 right-20 w-24 h-24 bg-gradient-to-br from-black/10 to-black/20 rounded-full blur-xl opacity-20 animate-float delay-1000"></div>
+                <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-gradient-to-br from-green-200 to-green-300 rounded-full blur-3xl opacity-20 animate-float delay-500"></div>
                 
                 <div className="text-center relative z-10">
                     <div className="relative mb-8">
-                        <div className="w-20 h-20 bg-gradient-to-br from-purple-400 via-pink-400 to-yellow-400 rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-200/50 animate-float mx-auto relative">
+                        <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-3xl flex items-center justify-center shadow-2xl shadow-green-200/50 animate-float mx-auto relative">
                             <UserPlusIcon className="w-10 h-10 text-white drop-shadow-lg" />
-                            <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full animate-rainbow-pulse"></div>
-                            <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full animate-ping"></div>
+                            <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-r from-green-400 to-green-500 rounded-full animate-green-pulse"></div>
+                            <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-gradient-to-r from-gray-600 to-black rounded-full animate-ping"></div>
                         </div>
                     </div>
-                    <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-pink-500 to-yellow-500 bg-clip-text text-transparent mb-4 animate-rainbow-text">
+                    <h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-black bg-clip-text text-transparent mb-4 animate-green-text">
                         Preparing Registration
                     </h2>
                     <div className="flex space-x-2 justify-center">
-                        <div className="w-3 h-3 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full animate-bounce"></div>
-                        <div className="w-3 h-3 bg-gradient-to-r from-pink-400 to-orange-400 rounded-full animate-bounce delay-100"></div>
-                        <div className="w-3 h-3 bg-gradient-to-r from-orange-400 to-yellow-400 rounded-full animate-bounce delay-200"></div>
-                        <div className="w-3 h-3 bg-gradient-to-r from-yellow-400 to-green-400 rounded-full animate-bounce delay-300"></div>
-                        <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-blue-400 rounded-full animate-bounce delay-400"></div>
+                        <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-green-500 rounded-full animate-bounce"></div>
+                        <div className="w-3 h-3 bg-gradient-to-r from-green-500 to-green-600 rounded-full animate-bounce delay-100"></div>
+                        <div className="w-3 h-3 bg-gradient-to-r from-black to-gray-700 rounded-full animate-bounce delay-200"></div>
+                        <div className="w-3 h-3 bg-gradient-to-r from-gray-700 to-gray-800 rounded-full animate-bounce delay-300"></div>
+                        <div className="w-3 h-3 bg-gradient-to-r from-green-600 to-green-700 rounded-full animate-bounce delay-400"></div>
                     </div>
                 </div>
             </div>
@@ -180,49 +326,32 @@ const Register: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 via-blue-50 to-yellow-50 relative overflow-hidden">
-            <Head title="Register" />
+        <div className="min-h-screen bg-white relative overflow-hidden">
             
-            {/* Enhanced Colorful Floating Elements */}
+            {/* Enhanced Floating Elements */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                {/* Colorful Background Orbs */}
-                <div className="absolute top-20 left-10 w-64 h-64 bg-gradient-to-br from-pink-300/30 to-rose-400/30 rounded-full blur-3xl animate-float-slow"></div>
-                <div className="absolute top-40 right-20 w-48 h-48 bg-gradient-to-br from-blue-300/25 to-cyan-400/25 rounded-full blur-2xl animate-float-slow delay-1000"></div>
-                <div className="absolute bottom-32 left-1/4 w-56 h-56 bg-gradient-to-br from-emerald-300/20 to-teal-400/20 rounded-full blur-3xl animate-float-slow delay-500"></div>
-                <div className="absolute bottom-20 right-10 w-32 h-32 bg-gradient-to-br from-orange-300/30 to-yellow-400/30 rounded-full blur-2xl animate-float delay-700"></div>
+                {/* Background Orbs */}
+                <div className="absolute top-20 left-10 w-64 h-64 bg-gradient-to-br from-green-100/30 to-green-200/30 rounded-full blur-3xl animate-float-slow"></div>
+                <div className="absolute top-40 right-20 w-48 h-48 bg-gradient-to-br from-black/5 to-black/10 rounded-full blur-2xl animate-float-slow delay-1000"></div>
+                <div className="absolute bottom-32 left-1/4 w-56 h-56 bg-gradient-to-br from-green-200/20 to-green-300/20 rounded-full blur-3xl animate-float-slow delay-500"></div>
+                <div className="absolute bottom-20 right-10 w-32 h-32 bg-gradient-to-br from-green-300/30 to-green-400/30 rounded-full blur-2xl animate-float delay-700"></div>
                 
-                {/* Colorful Icons */}
+                {/* Icons */}
                 <div className="absolute top-10 left-5 md:top-20 md:left-10 opacity-30">
-                    <BookOpenIcon className="w-8 h-8 md:w-12 md:h-12 text-emerald-500 animate-float-slow" />
+                    <BookOpenIcon className="w-8 h-8 md:w-12 md:h-12 text-green-500 animate-float-slow" />
                 </div>
                 <div className="absolute top-32 right-8 md:top-40 md:right-20 opacity-25">
-                    <PencilIcon className="w-6 h-6 md:w-10 md:h-10 text-cyan-500 animate-pencil-write delay-1000" />
+                    <UsersIcon className="w-6 h-6 md:w-10 md:h-10 text-black animate-float-slow delay-1000" />
                 </div>
                 <div className="absolute bottom-40 left-8 md:bottom-32 md:left-1/4 opacity-30">
-                    <UserPlusIcon className="w-6 h-6 md:w-8 md:h-8 text-pink-500 animate-bounce-gentle" />
+                    <UserPlusIcon className="w-6 h-6 md:w-8 md:h-8 text-green-600 animate-bounce-gentle" />
                 </div>
                 <div className="absolute top-60 right-4 md:right-16 opacity-25">
-                    <StarIcon className="w-5 h-5 md:w-7 md:h-7 text-orange-500 animate-rainbow-pulse delay-500" />
+                    <StarIcon className="w-5 h-5 md:w-7 md:h-7 text-gray-800 animate-green-pulse delay-500" />
                 </div>
                 <div className="absolute bottom-20 right-6 md:bottom-20 md:right-10 opacity-30">
-                    <HeartIcon className="w-6 h-6 md:w-8 md:h-8 text-purple-500 animate-heart-beat" />
+                    <CalendarIcon className="w-6 h-6 md:w-8 md:h-8 text-green-500 animate-bubble" />
                 </div>
-                
-                {/* New Colorful Elements */}
-                <div className="absolute top-1/4 left-20 opacity-20">
-                    <StarIcon className="w-8 h-8 text-yellow-400 animate-rainbow-pulse" />
-                </div>
-                <div className="absolute top-1/3 right-32 opacity-25">
-                    <HeartIcon className="w-6 h-6 text-pink-400 animate-heart-beat" />
-                </div>
-                <div className="absolute bottom-1/3 left-16 opacity-20">
-                    <UsersIcon className="w-10 h-10 text-blue-400 animate-float-slow delay-700" />
-                </div>
-                
-                {/* Floating colored papers */}
-                <div className="absolute top-1/3 left-12 w-8 h-10 md:w-12 md:h-16 bg-gradient-to-br from-pink-200 to-rose-300 rounded-sm shadow-lg animate-paper-float opacity-40"></div>
-                <div className="absolute bottom-1/3 right-12 w-6 h-8 md:w-10 md:h-12 bg-gradient-to-br from-blue-200 to-cyan-300 rounded-sm shadow-md animate-paper-float delay-700 opacity-35"></div>
-                <div className="absolute top-1/2 left-1/3 w-7 h-9 bg-gradient-to-br from-emerald-200 to-green-300 rounded-sm shadow-md animate-paper-float delay-1200 opacity-30"></div>
             </div>
 
             <div className="relative z-10 min-h-screen flex flex-col xl:flex-row">
@@ -233,64 +362,64 @@ const Register: React.FC = () => {
                     <div className="max-w-lg w-full text-center animate-fade-in-up">
                         {/* Enhanced Logo */}
                         <div className="mb-8 md:mb-12 transform hover:scale-105 transition-transform duration-500">
-                            <div className="mx-auto w-16 h-16 md:w-20 lg:w-24 md:h-20 lg:h-24 bg-gradient-to-br from-purple-400 via-pink-400 via-blue-400 to-yellow-400 rounded-2xl md:rounded-3xl flex items-center justify-center shadow-2xl shadow-purple-200/50 animate-float relative">
+                            <div className="mx-auto w-16 h-16 md:w-20 lg:w-24 md:h-20 lg:h-24 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl md:rounded-3xl flex items-center justify-center shadow-2xl shadow-green-200/50 animate-float relative">
                                 <AcademicCapIcon className="w-8 h-8 md:w-10 lg:w-12 md:h-10 lg:h-12 text-white drop-shadow-lg" />
-                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full animate-rainbow-pulse"></div>
-                                <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full animate-ping"></div>
+                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-green-400 to-green-500 rounded-full animate-green-pulse"></div>
+                                <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-gradient-to-r from-gray-600 to-black rounded-full animate-ping"></div>
                             </div>
                             <div className="mt-4 md:mt-6">
-                                <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-purple-600 via-pink-500 via-blue-500 to-yellow-500 bg-clip-text text-transparent mb-2 md:mb-3 animate-rainbow-text">
+                                <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-green-600 to-black bg-clip-text text-transparent mb-2 md:mb-3 animate-green-text">
                                     Micro LMS
                                 </h1>
-                                <div className="w-16 md:w-20 h-1 bg-gradient-to-r from-purple-400 via-pink-400 to-yellow-400 mx-auto rounded-full animate-gradient-shift"></div>
+                                <div className="w-16 md:w-20 h-1 bg-gradient-to-r from-green-500 to-black mx-auto rounded-full animate-gradient-shift"></div>
                             </div>
                         </div>
                         
                         {/* Enhanced Welcome Text */}
                         <div className="space-y-4 md:space-y-6 mb-8 md:mb-12">
                             <h2 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-gray-800 leading-tight animate-slide-in-left">
-                                Join the<br />
-                                <span className="bg-gradient-to-r from-purple-600 via-pink-500 via-blue-500 to-yellow-500 bg-clip-text text-transparent animate-rainbow-text">
-                                    Learning Revolution
+                                Start Your<br />
+                                <span className="bg-gradient-to-r from-green-600 to-black bg-clip-text text-transparent animate-green-text">
+                                    Learning Journey
                                 </span>
                             </h2>
                             <p className="text-gray-600 text-lg md:text-xl animate-slide-in-right delay-200">
-                                Create your account and<br />
-                                <span className="font-semibold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">start your journey today</span>
+                                Join our classes and<br />
+                                <span className="font-semibold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent">unlock your potential</span>
                             </p>
                             <div className="pt-4 md:pt-6 animate-fade-in delay-400">
                                 <p className="text-gray-600 text-sm mb-3 md:mb-4">
                                     Already have an account?
                                 </p>
-                                <Link
-                                    href={route('login')}
-                                    className="inline-block bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-500 hover:via-teal-500 hover:to-cyan-500 text-white font-semibold py-2.5 md:py-3 px-6 md:px-8 rounded-xl md:rounded-2xl transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 shadow-lg hover:shadow-xl cursor-pointer animate-rainbow-glow text-sm md:text-base relative overflow-hidden group"
+                                <button
+                                    onClick={() => window.location.href = '#login'}
+                                    className="inline-block bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-2.5 md:py-3 px-6 md:px-8 rounded-xl md:rounded-2xl transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 shadow-lg hover:shadow-xl cursor-pointer animate-green-glow text-sm md:text-base relative overflow-hidden group"
                                 >
                                     <span className="relative z-10">Sign In</span>
                                     <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                                </Link>
+                                </button>
                             </div>
                         </div>
                         
                         {/* Enhanced Features */}
-                        <div className="hidden md:block backdrop-blur-sm bg-gradient-to-br from-white/80 to-white/60 border border-purple-100/50 rounded-2xl md:rounded-3xl shadow-xl shadow-purple-100/30 p-4 md:p-6 lg:p-8 transform hover:scale-105 transition-all duration-500 animate-slide-in-up delay-600">
+                        <div className="hidden md:block backdrop-blur-sm bg-gradient-to-br from-white/90 to-gray-50/80 border border-green-100 rounded-2xl md:rounded-3xl shadow-xl shadow-green-100/30 p-4 md:p-6 lg:p-8 transform hover:scale-105 transition-all duration-500 animate-slide-in-up delay-600">
                             <h3 className="text-sm font-semibold text-gray-800 mb-4 md:mb-6 flex items-center justify-center">
-                                <UserPlusIcon className="w-4 h-4 mr-2 text-purple-600 animate-bounce-gentle" />
-                                <div className="w-3 h-3 bg-gradient-to-r from-purple-400 via-pink-400 to-yellow-400 rounded-full mr-3 ml-2 animate-rainbow-pulse"></div>
+                                <UserPlusIcon className="w-4 h-4 mr-2 text-green-600 animate-bounce-gentle" />
+                                <div className="w-3 h-3 bg-gradient-to-r from-green-500 to-green-600 rounded-full mr-3 ml-2 animate-green-pulse"></div>
                                 What You'll Get
                             </h3>
                             <div className="space-y-3 md:space-y-4 text-xs md:text-sm">
-                                <div className="flex items-center p-3 md:p-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 rounded-xl transition-all duration-300 hover:shadow-md transform hover:-translate-y-1 hover:from-emerald-100 hover:via-teal-100 hover:to-cyan-100">
-                                    <div className="w-3 h-3 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full mr-3 animate-pulse"></div>
-                                    <span className="text-gray-800 font-medium">Access to all courses</span>
+                                <div className="flex items-center p-3 md:p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-xl transition-all duration-300 hover:shadow-md transform hover:-translate-y-1 hover:from-green-100 hover:to-green-200">
+                                    <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-green-500 rounded-full mr-3 animate-pulse"></div>
+                                    <span className="text-gray-800 font-medium">Expert-led live classes</span>
                                 </div>
-                                <div className="flex items-center p-3 md:p-4 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-xl transition-all duration-300 hover:shadow-md transform hover:-translate-y-1 hover:from-blue-100 hover:via-indigo-100 hover:to-purple-100">
-                                    <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-full mr-3 animate-pulse delay-200"></div>
-                                    <span className="text-gray-800 font-medium">Interactive quizzes</span>
+                                <div className="flex items-center p-3 md:p-4 bg-gradient-to-r from-green-100 to-green-200 rounded-xl transition-all duration-300 hover:shadow-md transform hover:-translate-y-1 hover:from-green-200 hover:to-green-300">
+                                    <div className="w-3 h-3 bg-gradient-to-r from-green-500 to-green-600 rounded-full mr-3 animate-pulse delay-200"></div>
+                                    <span className="text-gray-800 font-medium">Interactive assessments</span>
                                 </div>
-                                <div className="flex items-center p-3 md:p-4 bg-gradient-to-r from-purple-50 via-pink-50 to-rose-50 rounded-xl transition-all duration-300 hover:shadow-md transform hover:-translate-y-1 hover:from-purple-100 hover:via-pink-100 hover:to-rose-100">
-                                    <div className="w-3 h-3 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full mr-3 animate-pulse delay-400"></div>
-                                    <span className="text-gray-800 font-medium">Progress tracking</span>
+                                <div className="flex items-center p-3 md:p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl transition-all duration-300 hover:shadow-md transform hover:-translate-y-1 hover:from-gray-100 hover:to-gray-200">
+                                    <div className="w-3 h-3 bg-gradient-to-r from-gray-600 to-black rounded-full mr-3 animate-pulse delay-400"></div>
+                                    <span className="text-gray-800 font-medium">Performance tracking</span>
                                 </div>
                             </div>
                         </div>
@@ -302,68 +431,23 @@ const Register: React.FC = () => {
                     isLoaded ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
                 }`}>
                     <div className="w-full max-w-md relative">
-                        <div className="backdrop-blur-lg bg-gradient-to-br from-white/90 to-white/70 border border-white/30 rounded-2xl md:rounded-3xl shadow-2xl shadow-purple-200/30 p-6 md:p-8 lg:p-10 animate-slide-in-right relative overflow-hidden">
-                            {/* Colorful background gradient overlay */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-purple-50/50 via-pink-50/30 to-yellow-50/50 rounded-2xl md:rounded-3xl"></div>
+                        <div className="backdrop-blur-lg bg-gradient-to-br from-white/95 to-gray-50/90 border border-green-200 rounded-2xl md:rounded-3xl shadow-2xl shadow-green-200/30 p-6 md:p-8 lg:p-10 animate-slide-in-right relative overflow-hidden">
+                            {/* Background gradient overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-green-50/30 via-white to-gray-50/30 rounded-2xl md:rounded-3xl"></div>
                             
                             <div className="relative z-10">
                                 {/* Enhanced Form Header */}
                                 <div className="text-center mb-6 md:mb-8">
-                                    <h3 className="text-xl md:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-purple-600 via-pink-500 to-yellow-500 bg-clip-text text-transparent mb-2 animate-rainbow-text">
-                                        Create Your Account
+                                    <h3 className="text-xl md:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-green-600 to-black bg-clip-text text-transparent mb-2 animate-green-text">
+                                        Student Registration
                                     </h3>
-                                    <p className="text-gray-600 text-sm animate-fade-in delay-200">Fill in your details to get started</p>
-                                    <div className="w-12 md:w-16 h-1 bg-gradient-to-r from-purple-400 via-pink-400 to-yellow-400 mx-auto rounded-full animate-gradient-shift mt-2"></div>
+                                    <p className="text-gray-600 text-sm animate-fade-in delay-200">Join our learning community</p>
+                                    <div className="w-12 md:w-16 h-1 bg-gradient-to-r from-green-500 to-black mx-auto rounded-full animate-gradient-shift mt-2"></div>
                                 </div>
 
-                                <form onSubmit={submit} className="space-y-4 md:space-y-5">
-                                    {/* Enhanced Role Selection */}
+                                <div className="space-y-4 md:space-y-5">
+                                    {/* Personal Information */}
                                     <div className="animate-slide-in-up delay-200">
-                                        <label className="block text-gray-700 text-sm font-semibold mb-3">
-                                            Select Your Role *
-                                        </label>
-                                        <div className="grid grid-cols-1 gap-2">
-                                            {roles.map((role, index) => {
-                                                const IconComponent = role.icon;
-                                                return (
-                                                    <label
-                                                        key={role.value}
-                                                        className={`relative flex items-center p-3 bg-gradient-to-r ${role.gradient} ${role.hoverGradient} border-2 border-white/40 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-md transform hover:-translate-y-1 ${
-                                                            data.role === role.value ? 'border-purple-300 shadow-lg shadow-purple-100/50 scale-105' : 'hover:border-purple-200'
-                                                        } animate-fade-in`}
-                                                        style={{ animationDelay: `${index * 100 + 300}ms` }}
-                                                    >
-                                                        <input
-                                                            type="radio"
-                                                            name="role"
-                                                            value={role.value}
-                                                            checked={data.role === role.value}
-                                                            onChange={(e) => setData('role', e.target.value)}
-                                                            className="sr-only"
-                                                        />
-                                                        <div className="flex items-center flex-1">
-                                                            <div className={`w-10 h-10 bg-gradient-to-br ${role.bgGradient} rounded-lg flex items-center justify-center mr-3 shadow-sm`}>
-                                                                <IconComponent className={`w-5 h-5 ${role.textColor}`} />
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <div className={`${role.textColor} font-semibold text-sm`}>{role.label}</div>
-                                                                <div className="text-gray-600 text-xs">{role.description}</div>
-                                                            </div>
-                                                            {data.role === role.value && (
-                                                                <div className="w-3 h-3 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full animate-pulse"></div>
-                                                            )}
-                                                        </div>
-                                                    </label>
-                                                );
-                                            })}
-                                        </div>
-                                        {errors.role && (
-                                            <p className="mt-2 text-red-500 text-xs md:text-sm animate-shake">{errors.role}</p>
-                                        )}
-                                    </div>
-
-                                    {/* Enhanced Full Name Field */}
-                                    <div className="animate-slide-in-up delay-400">
                                         <label htmlFor="name" className="block text-gray-700 text-sm font-semibold mb-2">
                                             Full Name *
                                         </label>
@@ -375,21 +459,19 @@ const Register: React.FC = () => {
                                                 autoComplete="name"
                                                 required
                                                 value={data.name}
-                                                onChange={(e) => setData('name', e.target.value)}
-                                                className={`w-full px-4 py-3 bg-gradient-to-r from-white/95 to-white/90 border-2 border-purple-200/50 rounded-xl text-gray-800 placeholder-gray-400 transition-all duration-300 focus:outline-none focus:border-purple-400 focus:bg-white focus:shadow-lg focus:shadow-purple-100/50 group-hover:border-purple-300 group-hover:shadow-md text-sm ${
+                                                onChange={(e) => updateData('name', e.target.value)}
+                                                className={`w-full px-4 py-3 bg-white border-2 border-green-200 rounded-xl text-gray-800 placeholder-gray-400 transition-all duration-300 focus:outline-none focus:border-green-500 focus:bg-white focus:shadow-lg focus:shadow-green-100/50 group-hover:border-green-400 group-hover:shadow-md text-sm ${
                                                     errors.name ? 'border-red-300 focus:border-red-400' : ''
                                                 }`}
                                                 placeholder="Enter your full name"
                                             />
-                                            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-200/10 via-pink-200/10 to-yellow-200/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                                         </div>
                                         {errors.name && (
                                             <p className="mt-2 text-red-500 text-xs animate-shake">{errors.name}</p>
                                         )}
                                     </div>
 
-                                    {/* Enhanced Email Field */}
-                                    <div className="animate-slide-in-up delay-500">
+                                    <div className="animate-slide-in-up delay-300">
                                         <label htmlFor="email" className="block text-gray-700 text-sm font-semibold mb-2">
                                             Email Address *
                                         </label>
@@ -401,21 +483,19 @@ const Register: React.FC = () => {
                                                 autoComplete="email"
                                                 required
                                                 value={data.email}
-                                                onChange={(e) => setData('email', e.target.value)}
-                                                className={`w-full px-4 py-3 bg-gradient-to-r from-white/95 to-white/90 border-2 border-purple-200/50 rounded-xl text-gray-800 placeholder-gray-400 transition-all duration-300 focus:outline-none focus:border-purple-400 focus:bg-white focus:shadow-lg focus:shadow-purple-100/50 group-hover:border-purple-300 group-hover:shadow-md text-sm ${
+                                                onChange={(e) => updateData('email', e.target.value)}
+                                                className={`w-full px-4 py-3 bg-white border-2 border-green-200 rounded-xl text-gray-800 placeholder-gray-400 transition-all duration-300 focus:outline-none focus:border-green-500 focus:bg-white focus:shadow-lg focus:shadow-green-100/50 group-hover:border-green-400 group-hover:shadow-md text-sm ${
                                                     errors.email ? 'border-red-300 focus:border-red-400' : ''
                                                 }`}
                                                 placeholder="Enter your email address"
                                             />
-                                            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-200/10 via-pink-200/10 to-yellow-200/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                                         </div>
                                         {errors.email && (
                                             <p className="mt-2 text-red-500 text-xs animate-shake">{errors.email}</p>
                                         )}
                                     </div>
 
-                                    {/* Enhanced Phone Field */}
-                                    <div className="animate-slide-in-up delay-600">
+                                    <div className="animate-slide-in-up delay-400">
                                         <label htmlFor="phone" className="block text-gray-700 text-sm font-semibold mb-2">
                                             Phone Number *
                                         </label>
@@ -427,21 +507,166 @@ const Register: React.FC = () => {
                                                 autoComplete="tel"
                                                 required
                                                 value={data.phone}
-                                                onChange={(e) => setData('phone', e.target.value)}
-                                                className={`w-full px-4 py-3 bg-gradient-to-r from-white/95 to-white/90 border-2 border-purple-200/50 rounded-xl text-gray-800 placeholder-gray-400 transition-all duration-300 focus:outline-none focus:border-purple-400 focus:bg-white focus:shadow-lg focus:shadow-purple-100/50 group-hover:border-purple-300 group-hover:shadow-md text-sm ${
+                                                onChange={(e) => updateData('phone', e.target.value)}
+                                                className={`w-full px-4 py-3 bg-white border-2 border-green-200 rounded-xl text-gray-800 placeholder-gray-400 transition-all duration-300 focus:outline-none focus:border-green-500 focus:bg-white focus:shadow-lg focus:shadow-green-100/50 group-hover:border-green-400 group-hover:shadow-md text-sm ${
                                                     errors.phone ? 'border-red-300 focus:border-red-400' : ''
                                                 }`}
                                                 placeholder="Enter your phone number"
                                             />
-                                            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-200/10 via-pink-200/10 to-yellow-200/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                                         </div>
                                         {errors.phone && (
                                             <p className="mt-2 text-red-500 text-xs animate-shake">{errors.phone}</p>
                                         )}
                                     </div>
 
-                                    {/* Enhanced Password Field */}
-                                    <div className="animate-slide-in-up delay-700">
+                                    {/* Batch Selection */}
+                                    <div className="animate-slide-in-up delay-500">
+                                        <label className="block text-gray-700 text-sm font-semibold mb-3">
+                                            Select Batch *
+                                        </label>
+                                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                                            {batches.map((batch, index) => (
+                                                <label
+                                                    key={batch.id}
+                                                    className={`relative flex items-start p-3 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 border-2 border-white/40 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-md transform hover:-translate-y-1 ${
+                                                        data.batch_id === batch.id ? 'border-green-300 shadow-lg shadow-green-100/50 scale-105 from-green-100 to-green-200' : 'hover:border-green-200'
+                                                    } animate-fade-in`}
+                                                    style={{ animationDelay: `${index * 100 + 500}ms` }}
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        name="batch"
+                                                        value={batch.id}
+                                                        checked={data.batch_id === batch.id}
+                                                        onChange={() => handleBatchSelect(batch)}
+                                                        className="sr-only"
+                                                    />
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <div className="text-green-700 font-semibold text-sm">{batch.name}</div>
+                                                            {data.batch_id === batch.id && (
+                                                                <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-green-500 rounded-full animate-pulse"></div>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-gray-600 text-xs mb-2">{batch.description}</div>
+                                                        <div className="flex flex-wrap gap-2 text-xs">
+                                                            <span className="bg-green-200 text-green-800 px-2 py-1 rounded-full">{batch.fee}</span>
+                                                            <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full">{batch.teacher}</span>
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mt-1">{batch.schedule} • {batch.students}/{batch.maxStudents} students</div>
+                                                    </div>
+                                                </label>
+                                            ))}
+                                        </div>
+                                        {errors.batch_id && (
+                                            <p className="mt-2 text-red-500 text-xs animate-shake">{errors.batch_id}</p>
+                                        )}
+                                    </div>
+
+                                    {/* Class Type Selection */}
+                                    {selectedBatch && (
+                                        <div className="animate-slide-in-up delay-600">
+                                            <label className="block text-gray-700 text-sm font-semibold mb-3">
+                                                Select Class Type *
+                                            </label>
+                                            <div className="space-y-2">
+                                                {classes.map((classType, index) => (
+                                                    <label
+                                                        key={classType.id}
+                                                        className={`relative flex items-center p-3 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 border-2 border-white/40 rounded-xl cursor-pointer transition-all duration-300 hover:shadow-md transform hover:-translate-y-1 ${
+                                                            data.class_id === classType.id ? 'border-blue-300 shadow-lg shadow-blue-100/50 scale-105 from-blue-100 to-blue-200' : 'hover:border-blue-200'
+                                                        } animate-fade-in`}
+                                                        style={{ animationDelay: `${index * 100 + 600}ms` }}
+                                                    >
+                                                        <input
+                                                            type="radio"
+                                                            name="class"
+                                                            value={classType.id}
+                                                            checked={data.class_id === classType.id}
+                                                            onChange={(e) => updateData('class_id', e.target.value)}
+                                                            className="sr-only"
+                                                        />
+                                                        <div className="flex items-center flex-1">
+                                                            <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center mr-3 shadow-sm">
+                                                                <CalendarIcon className="w-5 h-5 text-blue-600" />
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <div className="text-blue-700 font-semibold text-sm">{classType.name}</div>
+                                                                <div className="text-gray-600 text-xs">{classType.description}</div>
+                                                                <div className="text-blue-600 font-medium text-xs mt-1">{classType.fee}</div>
+                                                            </div>
+                                                            {data.class_id === classType.id && (
+                                                                <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-blue-500 rounded-full animate-pulse"></div>
+                                                            )}
+                                                        </div>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                            {errors.class_id && (
+                                                <p className="mt-2 text-red-500 text-xs animate-shake">{errors.class_id}</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Bank Slip Upload */}
+                                    {data.class_id && (
+                                        <div className="animate-slide-in-up delay-700">
+                                            <label className="block text-gray-700 text-sm font-semibold mb-3">
+                                                Upload Payment Slip *
+                                            </label>
+                                            <div
+                                                className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300 ${
+                                                    dragActive 
+                                                        ? 'border-green-400 bg-green-50' 
+                                                        : data.bank_slip 
+                                                            ? 'border-green-300 bg-green-50' 
+                                                            : 'border-gray-300 hover:border-green-400 hover:bg-green-50'
+                                                }`}
+                                                onDragEnter={handleDrag}
+                                                onDragLeave={handleDrag}
+                                                onDragOver={handleDrag}
+                                                onDrop={handleDrop}
+                                            >
+                                                <input
+                                                    type="file"
+                                                    id="bank_slip"
+                                                    accept="image/*,.pdf"
+                                                    onChange={handleFileChange}
+                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                />
+                                                <div className="space-y-2">
+                                                    <div className="mx-auto w-12 h-12 bg-gradient-to-r from-green-100 to-green-200 rounded-full flex items-center justify-center">
+                                                        <UploadIcon className="w-6 h-6 text-green-600" />
+                                                    </div>
+                                                    {data.bank_slip ? (
+                                                        <div>
+                                                            <p className="text-sm font-medium text-green-700">
+                                                                {data.bank_slip.name}
+                                                            </p>
+                                                            <p className="text-xs text-gray-500">
+                                                                Click to change or drag a new file
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        <div>
+                                                            <p className="text-sm font-medium text-gray-700">
+                                                                Drag and drop your payment slip
+                                                            </p>
+                                                            <p className="text-xs text-gray-500">
+                                                                or click to browse (Image or PDF)
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {errors.bank_slip && (
+                                                <p className="mt-2 text-red-500 text-xs animate-shake">{errors.bank_slip}</p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Password Fields */}
+                                    <div className="animate-slide-in-up delay-800">
                                         <label htmlFor="password" className="block text-gray-700 text-sm font-semibold mb-2">
                                             Password *
                                         </label>
@@ -453,15 +678,15 @@ const Register: React.FC = () => {
                                                 autoComplete="new-password"
                                                 required
                                                 value={data.password}
-                                                onChange={(e) => setData('password', e.target.value)}
-                                                className={`w-full px-4 py-3 pr-12 bg-gradient-to-r from-white/95 to-white/90 border-2 border-purple-200/50 rounded-xl text-gray-800 placeholder-gray-400 transition-all duration-300 focus:outline-none focus:border-purple-400 focus:bg-white focus:shadow-lg focus:shadow-purple-100/50 group-hover:border-purple-300 group-hover:shadow-md text-sm ${
+                                                onChange={(e) => updateData('password', e.target.value)}
+                                                className={`w-full px-4 py-3 pr-12 bg-white border-2 border-green-200 rounded-xl text-gray-800 placeholder-gray-400 transition-all duration-300 focus:outline-none focus:border-green-500 focus:bg-white focus:shadow-lg focus:shadow-green-100/50 group-hover:border-green-400 group-hover:shadow-md text-sm ${
                                                     errors.password ? 'border-red-300 focus:border-red-400' : ''
                                                 }`}
                                                 placeholder="Create a password"
                                             />
                                             <button
                                                 type="button"
-                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-purple-600 transition-all duration-300 hover:scale-110"
+                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-green-600 transition-all duration-300 hover:scale-110"
                                                 onClick={() => setShowPassword(!showPassword)}
                                             >
                                                 {showPassword ? (
@@ -470,15 +695,13 @@ const Register: React.FC = () => {
                                                     <EyeIcon className="h-5 w-5" />
                                                 )}
                                             </button>
-                                            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-200/10 via-pink-200/10 to-yellow-200/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                                         </div>
                                         {errors.password && (
                                             <p className="mt-2 text-red-500 text-xs animate-shake">{errors.password}</p>
                                         )}
                                     </div>
 
-                                    {/* Enhanced Confirm Password Field */}
-                                    <div className="animate-slide-in-up delay-800">
+                                    <div className="animate-slide-in-up delay-900">
                                         <label htmlFor="password_confirmation" className="block text-gray-700 text-sm font-semibold mb-2">
                                             Confirm Password *
                                         </label>
@@ -490,15 +713,15 @@ const Register: React.FC = () => {
                                                 autoComplete="new-password"
                                                 required
                                                 value={data.password_confirmation}
-                                                onChange={(e) => setData('password_confirmation', e.target.value)}
-                                                className={`w-full px-4 py-3 pr-12 bg-gradient-to-r from-white/95 to-white/90 border-2 border-purple-200/50 rounded-xl text-gray-800 placeholder-gray-400 transition-all duration-300 focus:outline-none focus:border-purple-400 focus:bg-white focus:shadow-lg focus:shadow-purple-100/50 group-hover:border-purple-300 group-hover:shadow-md text-sm ${
+                                                onChange={(e) => updateData('password_confirmation', e.target.value)}
+                                                className={`w-full px-4 py-3 pr-12 bg-white border-2 border-green-200 rounded-xl text-gray-800 placeholder-gray-400 transition-all duration-300 focus:outline-none focus:border-green-500 focus:bg-white focus:shadow-lg focus:shadow-green-100/50 group-hover:border-green-400 group-hover:shadow-md text-sm ${
                                                     errors.password_confirmation ? 'border-red-300 focus:border-red-400' : ''
                                                 }`}
                                                 placeholder="Confirm your password"
                                             />
                                             <button
                                                 type="button"
-                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-purple-600 transition-all duration-300 hover:scale-110"
+                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-green-600 transition-all duration-300 hover:scale-110"
                                                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                                             >
                                                 {showConfirmPassword ? (
@@ -507,37 +730,37 @@ const Register: React.FC = () => {
                                                     <EyeIcon className="h-5 w-5" />
                                                 )}
                                             </button>
-                                            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-200/10 via-pink-200/10 to-yellow-200/10 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                                         </div>
                                         {errors.password_confirmation && (
                                             <p className="mt-2 text-red-500 text-xs animate-shake">{errors.password_confirmation}</p>
                                         )}
                                     </div>
 
-                                    {/* Enhanced Terms */}
-                                    <div className="text-center animate-slide-in-up delay-900">
+                                    {/* Terms */}
+                                    <div className="text-center animate-slide-in-up delay-1000">
                                         <p className="text-gray-600 text-xs leading-relaxed">
-                                            By creating an account, you agree to our<br />
-                                            <span className="text-purple-600 hover:text-pink-500 hover:underline cursor-pointer font-medium transition-colors duration-200">Terms of Service</span> and{' '}
-                                            <span className="text-purple-600 hover:text-pink-500 hover:underline cursor-pointer font-medium transition-colors duration-200">Privacy Policy</span>
+                                            By registering, you agree to our<br />
+                                            <span className="text-green-600 hover:text-black hover:underline cursor-pointer font-medium transition-colors duration-200">Terms of Service</span> and{' '}
+                                            <span className="text-green-600 hover:text-black hover:underline cursor-pointer font-medium transition-colors duration-200">Privacy Policy</span>
                                         </p>
                                     </div>
 
-                                    {/* Enhanced Register Button */}
+                                    {/* Register Button */}
                                     <button
-                                        type="submit"
+                                        type="button"
+                                        onClick={submit}
                                         disabled={processing}
-                                        className="w-full bg-gradient-to-r from-purple-400 via-pink-400 to-yellow-400 hover:from-purple-500 hover:via-pink-500 hover:to-yellow-500 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100 disabled:hover:translate-y-0 relative overflow-hidden group shadow-lg hover:shadow-xl animate-slide-in-up delay-1000 text-sm animate-rainbow-glow"
+                                        className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100 disabled:hover:translate-y-0 relative overflow-hidden group shadow-lg hover:shadow-xl animate-slide-in-up delay-1100 text-sm animate-green-glow"
                                     >
                                         <span className="relative z-10">
                                             {processing ? (
                                                 <div className="flex items-center justify-center space-x-2">
                                                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                                    <span className="animate-pulse">CREATING ACCOUNT...</span>
+                                                    <span className="animate-pulse">PROCESSING...</span>
                                                 </div>
                                             ) : (
                                                 <span className="flex items-center justify-center space-x-2">
-                                                    <span>CREATE ACCOUNT</span>
+                                                    <span>REGISTER AS STUDENT</span>
                                                     <UserPlusIcon className="w-4 h-4 animate-bounce-gentle delay-200" />
                                                 </span>
                                             )}
@@ -545,20 +768,20 @@ const Register: React.FC = () => {
                                         <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                                     </button>
 
-                                    {/* Enhanced Login Link */}
-                                    <div className="text-center mt-6 pt-4 border-t border-gradient-to-r from-purple-100 to-pink-100 animate-slide-in-up delay-1100">
+                                    {/* Login Link */}
+                                    <div className="text-center mt-6 pt-4 border-t border-green-100 animate-slide-in-up delay-1200">
                                         <p className="text-gray-600 text-xs mb-3">
                                             Already have an account?
                                         </p>
-                                        <Link
-                                            href={route('login')}
-                                            className="inline-block bg-gradient-to-r from-white/90 to-white/80 hover:from-white hover:to-white border-2 border-purple-200 hover:border-purple-400 text-purple-600 hover:text-purple-700 font-semibold py-2 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 cursor-pointer shadow-md hover:shadow-lg text-xs relative overflow-hidden group"
+                                        <button
+                                            onClick={() => window.location.href = '#login'}
+                                            className="inline-block bg-white hover:bg-gray-50 border-2 border-green-200 hover:border-green-400 text-green-600 hover:text-green-700 font-semibold py-2 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 hover:-translate-y-1 cursor-pointer shadow-md hover:shadow-lg text-xs relative overflow-hidden group"
                                         >
                                             <span className="relative z-10">Sign In</span>
-                                            <div className="absolute inset-0 bg-gradient-to-r from-purple-50/0 via-purple-50/50 to-purple-50/0 transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                                        </Link>
+                                            <div className="absolute inset-0 bg-gradient-to-r from-green-50/0 via-green-50/50 to-green-50/0 transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                                        </button>
                                     </div>
-                                </form>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -568,18 +791,18 @@ const Register: React.FC = () => {
             {/* Enhanced Loading Overlay */}
             {processing && (
                 <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-50 flex items-center justify-center">
-                    <div className="bg-gradient-to-br from-white/95 to-white/85 rounded-3xl p-8 shadow-2xl border border-white/20 text-center max-w-sm mx-4 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-50/50 via-pink-50/30 to-yellow-50/50 rounded-3xl"></div>
+                    <div className="bg-white rounded-3xl p-8 shadow-2xl border border-green-200 text-center max-w-sm mx-4 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 to-gray-50/30 rounded-3xl"></div>
                         <div className="relative z-10">
-                            <div className="w-16 h-16 bg-gradient-to-r from-purple-400 via-pink-400 to-yellow-400 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-float">
+                            <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-float">
                                 <div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin"></div>
                             </div>
-                            <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-600 via-pink-500 to-yellow-500 bg-clip-text text-transparent mb-2">Creating Your Account</h3>
-                            <p className="text-gray-600 text-sm">Please wait while we set up your profile...</p>
+                            <h3 className="text-lg font-semibold bg-gradient-to-r from-green-600 to-black bg-clip-text text-transparent mb-2">Processing Registration</h3>
+                            <p className="text-gray-600 text-sm">Please wait while we process your enrollment...</p>
                             <div className="flex justify-center space-x-1 mt-4">
-                                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
-                                <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce delay-100"></div>
-                                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce delay-200"></div>
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce"></div>
+                                <div className="w-2 h-2 bg-green-600 rounded-full animate-bounce delay-100"></div>
+                                <div className="w-2 h-2 bg-black rounded-full animate-bounce delay-200"></div>
                             </div>
                         </div>
                     </div>
@@ -659,48 +882,37 @@ const Register: React.FC = () => {
                         transform: translateY(-5px);
                     }
                 }
-                @keyframes pencil-write {
+                @keyframes bubble {
                     0%, 100% {
-                        transform: translateY(0px) rotate(-15deg);
+                        transform: scale(1) translateY(0);
                     }
                     50% {
-                        transform: translateY(-8px) rotate(-10deg);
+                        transform: scale(1.1) translateY(-5px);
                     }
                 }
-                @keyframes paper-float {
-                    0%, 100% {
-                        transform: translateY(0px) rotate(2deg);
-                    }
-                    33% {
-                        transform: translateY(-10px) rotate(-1deg);
-                    }
-                    66% {
-                        transform: translateY(-5px) rotate(3deg);
-                    }
-                }
-                @keyframes rainbow-pulse {
+                @keyframes green-pulse {
                     0% {
-                        background: linear-gradient(45deg, #f59e0b, #ec4899);
+                        background: linear-gradient(45deg, #22c55e, #16a34a);
                         transform: scale(1);
                     }
                     25% {
-                        background: linear-gradient(45deg, #ec4899, #8b5cf6);
+                        background: linear-gradient(45deg, #16a34a, #15803d);
                         transform: scale(1.1);
                     }
                     50% {
-                        background: linear-gradient(45deg, #8b5cf6, #06b6d4);
+                        background: linear-gradient(45deg, #15803d, #166534);
                         transform: scale(1.2);
                     }
                     75% {
-                        background: linear-gradient(45deg, #06b6d4, #10b981);
+                        background: linear-gradient(45deg, #166534, #14532d);
                         transform: scale(1.1);
                     }
                     100% {
-                        background: linear-gradient(45deg, #10b981, #f59e0b);
+                        background: linear-gradient(45deg, #14532d, #22c55e);
                         transform: scale(1);
                     }
                 }
-                @keyframes rainbow-text {
+                @keyframes green-text {
                     0% {
                         background-position: 0% 50%;
                     }
@@ -711,18 +923,18 @@ const Register: React.FC = () => {
                         background-position: 0% 50%;
                     }
                 }
-                @keyframes rainbow-glow {
+                @keyframes green-glow {
                     0%, 100% {
-                        box-shadow: 0 4px 15px rgba(147, 51, 234, 0.3), 0 0 20px rgba(236, 72, 153, 0.2);
+                        box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3), 0 0 20px rgba(22, 163, 74, 0.2);
                     }
                     25% {
-                        box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4), 0 0 20px rgba(6, 182, 212, 0.3);
+                        box-shadow: 0 4px 15px rgba(22, 163, 74, 0.4), 0 0 20px rgba(21, 128, 61, 0.3);
                     }
                     50% {
-                        box-shadow: 0 4px 15px rgba(6, 182, 212, 0.4), 0 0 20px rgba(16, 185, 129, 0.3);
+                        box-shadow: 0 4px 15px rgba(21, 128, 61, 0.4), 0 0 20px rgba(22, 101, 52, 0.3);
                     }
                     75% {
-                        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4), 0 0 20px rgba(245, 158, 11, 0.3);
+                        box-shadow: 0 4px 15px rgba(22, 101, 52, 0.4), 0 0 20px rgba(20, 83, 45, 0.3);
                     }
                 }
                 @keyframes gradient-shift {
@@ -734,20 +946,6 @@ const Register: React.FC = () => {
                     }
                     100% {
                         background-position: 0% 50%;
-                    }
-                }
-                @keyframes heart-beat {
-                    0%, 100% {
-                        transform: scale(1);
-                    }
-                    25% {
-                        transform: scale(1.1);
-                    }
-                    50% {
-                        transform: scale(1.2);
-                    }
-                    75% {
-                        transform: scale(1.1);
                     }
                 }
                 @keyframes shake {
@@ -786,32 +984,26 @@ const Register: React.FC = () => {
                 .animate-bounce-gentle {
                     animation: bounce-gentle 2s ease-in-out infinite;
                 }
-                .animate-pencil-write {
-                    animation: pencil-write 3s ease-in-out infinite;
+                .animate-bubble {
+                    animation: bubble 2.5s ease-in-out infinite;
                 }
-                .animate-paper-float {
-                    animation: paper-float 5s ease-in-out infinite;
+                .animate-green-pulse {
+                    animation: green-pulse 3s ease-in-out infinite;
                 }
-                .animate-rainbow-pulse {
-                    animation: rainbow-pulse 3s ease-in-out infinite;
-                }
-                .animate-rainbow-text {
-                    background: linear-gradient(90deg, #9333ea, #ec4899, #06b6d4, #10b981, #f59e0b, #9333ea);
+                .animate-green-text {
+                    background: linear-gradient(90deg, #22c55e, #16a34a, #000000, #374151, #22c55e);
                     background-size: 400% 100%;
-                    animation: rainbow-text 4s ease-in-out infinite;
+                    animation: green-text 4s ease-in-out infinite;
                     -webkit-background-clip: text;
                     -webkit-text-fill-color: transparent;
                 }
-                .animate-rainbow-glow {
-                    animation: rainbow-glow 3s ease-in-out infinite;
+                .animate-green-glow {
+                    animation: green-glow 3s ease-in-out infinite;
                 }
                 .animate-gradient-shift {
-                    background: linear-gradient(90deg, #9333ea, #ec4899, #f59e0b, #9333ea);
+                    background: linear-gradient(90deg, #22c55e, #16a34a, #000000, #22c55e);
                     background-size: 300% 100%;
                     animation: gradient-shift 3s ease-in-out infinite;
-                }
-                .animate-heart-beat {
-                    animation: heart-beat 2s ease-in-out infinite;
                 }
                 .animate-shake {
                     animation: shake 0.5s ease-in-out;

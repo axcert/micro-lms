@@ -157,13 +157,13 @@ const Welcome: React.FC<WelcomeProps> = ({ canLogin, canRegister, auth }) => {
             </header>
 
             {/* Hero Section - Split into 2 columns */}
-            <section className="relative z-10 bg-gradient-to-br from-green-500 via-green-600 to-emerald-600 text-white py-24 overflow-hidden">
+            <section className="relative z-10 bg-white text-gray-900 py-24 overflow-hidden">
                 {/* Hero Background Pattern */}
                 <div className="absolute inset-0 opacity-10">
-                    <div className="absolute top-10 left-10 w-32 h-32 border border-white/20 rounded-full"></div>
-                    <div className="absolute top-32 right-20 w-24 h-24 border border-white/20 rounded-full"></div>
-                    <div className="absolute bottom-20 left-1/4 w-40 h-40 border border-white/20 rounded-full"></div>
-                    <div className="absolute bottom-10 right-10 w-20 h-20 border border-white/20 rounded-full"></div>
+                    <div className="absolute top-10 left-10 w-32 h-32 border border-green-200 rounded-full"></div>
+                    <div className="absolute top-32 right-20 w-24 h-24 border border-green-200 rounded-full"></div>
+                    <div className="absolute bottom-20 left-1/4 w-40 h-40 border border-green-200 rounded-full"></div>
+                    <div className="absolute bottom-10 right-10 w-20 h-20 border border-green-200 rounded-full"></div>
                 </div>
                 
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
@@ -171,21 +171,21 @@ const Welcome: React.FC<WelcomeProps> = ({ canLogin, canRegister, auth }) => {
                         {/* Left Column - Text Content */}
                         <div className="text-center lg:text-left">
                             <div className="mb-8 animate-pulse">
-                                <div className="inline-flex items-center px-6 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
-                                    <div className="w-2 h-2 bg-green-300 rounded-full mr-2"></div>
-                                    <span className="text-sm font-medium">Modern Learning Platform</span>
+                                <div className="inline-flex items-center px-6 py-2 bg-green-100 backdrop-blur-sm rounded-full border border-green-200">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                    <span className="text-sm font-medium text-green-700">Modern Learning Platform</span>
                                 </div>
                             </div>
                             
                             <h1 className="text-4xl md:text-6xl lg:text-7xl font-black mb-8 leading-tight">
                                 Modern Learning
                                 <br />
-                                <span className="bg-gradient-to-r from-gray-800 via-black to-gray-900 bg-clip-text text-transparent">
+                                <span className="bg-gradient-to-r from-green-600 via-green-700 to-emerald-600 bg-clip-text text-transparent">
                                     Made Simple
                                 </span>
                             </h1>
                             
-                            <p className="text-lg md:text-xl mb-12 text-white/90 leading-relaxed font-light">
+                            <p className="text-lg md:text-xl mb-12 text-gray-600 leading-relaxed font-light">
                                 A comprehensive Learning Management System designed for teachers and students. 
                                 Manage classes, create quizzes, track progress, and enhance the learning experience.
                             </p>
@@ -194,7 +194,7 @@ const Welcome: React.FC<WelcomeProps> = ({ canLogin, canRegister, auth }) => {
                                 {isLoggedIn ? (
                                     <Link
                                         href={getDashboardRoute()}
-                                        className="group bg-black hover:bg-gray-900 text-white px-10 py-5 rounded-2xl font-bold text-lg transition-all duration-300 transform hover:scale-105 inline-flex items-center justify-center shadow-2xl hover:shadow-black/25"
+                                        className="group bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-10 py-5 rounded-2xl font-bold text-lg transition-all duration-300 transform hover:scale-105 inline-flex items-center justify-center shadow-2xl hover:shadow-green-500/25"
                                     >
                                         Continue to Dashboard
                                         <ArrowRightIcon className="w-6 h-6 ml-3 group-hover:translate-x-1 transition-transform duration-300" />
@@ -204,7 +204,7 @@ const Welcome: React.FC<WelcomeProps> = ({ canLogin, canRegister, auth }) => {
                                         {canRegister && (
                                             <Link
                                                 href="/register"
-                                                className="group bg-black hover:bg-gray-900 text-white px-10 py-5 rounded-2xl font-bold text-lg transition-all duration-300 transform hover:scale-105 inline-flex items-center justify-center shadow-2xl hover:shadow-black/25"
+                                                className="group bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-10 py-5 rounded-2xl font-bold text-lg transition-all duration-300 transform hover:scale-105 inline-flex items-center justify-center shadow-2xl hover:shadow-green-500/25"
                                             >
                                                 Start Your Journey
                                                 <ArrowRightIcon className="w-6 h-6 ml-3 group-hover:translate-x-1 transition-transform duration-300" />
@@ -213,7 +213,7 @@ const Welcome: React.FC<WelcomeProps> = ({ canLogin, canRegister, auth }) => {
                                         {canLogin && (
                                             <Link
                                                 href="/login"
-                                                className="bg-white/10 hover:bg-white/20 text-white px-10 py-5 rounded-2xl font-bold text-lg border-2 border-white/20 hover:border-white/40 transition-all duration-300 transform hover:scale-105 backdrop-blur-sm"
+                                                className="bg-gray-100 hover:bg-gray-200 text-gray-900 px-10 py-5 rounded-2xl font-bold text-lg border-2 border-gray-200 hover:border-gray-300 transition-all duration-300 transform hover:scale-105"
                                             >
                                                 Sign In
                                             </Link>
@@ -223,45 +223,54 @@ const Welcome: React.FC<WelcomeProps> = ({ canLogin, canRegister, auth }) => {
                             </div>
                         </div>
 
-                        {/* Right Column - Image/Illustration */}
+                        {/* Right Column - Hero Image */}
                         <div className="flex items-center justify-center lg:justify-end">
                             <div className="relative w-full max-w-lg">
-                                {/* Image Container with decorative elements */}
-                                <div className="relative bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 shadow-2xl transform hover:scale-105 transition-all duration-500">
-                                    {/* You can replace this with your actual image */}
-                                    <div className="bg-white/20 rounded-2xl p-12 text-center">
-                                        {/* Placeholder illustration - replace with your image */}
-                                        <div className="w-full h-80 bg-gradient-to-br from-white/20 to-white/5 rounded-xl flex flex-col items-center justify-center border border-white/30">
-                                            <AcademicCapIcon className="w-24 h-24 text-white/80 mb-6" />
-                                            <p className="text-white/90 font-semibold text-lg">Your Learning Platform</p>
-                                            <p className="text-white/70 text-sm mt-2">Replace with your hero image</p>
-                                        </div>
+                                {/* Main Image Container */}
+                                <div className="relative group">
+                                    {/* Image */}
+                                    <div className="relative overflow-hidden rounded-3xl shadow-2xl transform group-hover:scale-105 transition-all duration-500">
+                                        <img 
+                                            src="/images/image3.jpeg"
+                                            alt="Micro LMS - Modern Learning Platform"
+                                            className="w-full h-auto object-cover rounded-3xl"
+                                            loading="eager"
+                                        />
                                         
-                                        {/* Stats overlay */}
-                                        <div className="grid grid-cols-3 gap-4 mt-6">
-                                            <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm">
-                                                <div className="text-2xl font-bold text-white">100+</div>
-                                                <div className="text-xs text-white/80">Students</div>
-                                            </div>
-                                            <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm">
-                                                <div className="text-2xl font-bold text-white">50+</div>
-                                                <div className="text-xs text-white/80">Classes</div>
-                                            </div>
-                                            <div className="bg-white/10 rounded-xl p-3 backdrop-blur-sm">
-                                                <div className="text-2xl font-bold text-white">200+</div>
-                                                <div className="text-xs text-white/80">Quizzes</div>
+                                        {/* Image Overlay */}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent rounded-3xl"></div>
+                                        
+                                        {/* Floating Stats Overlay */}
+                                        <div className="absolute bottom-6 left-6 right-6">
+                                            <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-4 shadow-xl border border-white/20">
+                                                <div className="grid grid-cols-3 gap-4">
+                                                    <div className="text-center">
+                                                        <div className="text-2xl font-bold text-green-600">100+</div>
+                                                        <div className="text-xs text-gray-600 font-medium">Students</div>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="text-2xl font-bold text-green-600">50+</div>
+                                                        <div className="text-xs text-gray-600 font-medium">Classes</div>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="text-2xl font-bold text-green-600">200+</div>
+                                                        <div className="text-xs text-gray-600 font-medium">Quizzes</div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                     
-                                    {/* Floating elements for decoration */}
-                                    <div className="absolute -top-4 -right-4 w-8 h-8 bg-green-300 rounded-full animate-bounce"></div>
-                                    <div className="absolute -bottom-4 -left-4 w-6 h-6 bg-white/30 rounded-full animate-pulse"></div>
-                                    <div className="absolute top-1/2 -left-6 w-4 h-4 bg-green-400/50 rounded-full"></div>
+                                    {/* Floating Decorative Elements */}
+                                    <div className="absolute -top-4 -right-4 w-8 h-8 bg-green-400 rounded-full animate-bounce shadow-lg"></div>
+                                    <div className="absolute -bottom-4 -left-4 w-6 h-6 bg-gray-300 rounded-full animate-pulse shadow-lg"></div>
+                                    <div className="absolute top-1/2 -left-6 w-4 h-4 bg-green-500 rounded-full shadow-lg"></div>
+                                    <div className="absolute top-1/4 -right-6 w-5 h-5 bg-gray-400 rounded-full animate-pulse shadow-lg"></div>
                                 </div>
                                 
-                                {/* Background decoration */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent rounded-3xl -rotate-6 -z-10"></div>
+                                {/* Background Decoration */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 to-transparent rounded-3xl -rotate-6 -z-10 scale-105"></div>
+                                <div className="absolute inset-0 bg-gradient-to-tl from-green-100/30 to-transparent rounded-3xl rotate-3 -z-20 scale-110"></div>
                             </div>
                         </div>
                     </div>
@@ -409,7 +418,7 @@ const Welcome: React.FC<WelcomeProps> = ({ canLogin, canRegister, auth }) => {
                     {isLoggedIn ? (
                         <Link
                             href={getDashboardRoute()}
-                            className="group bg-white text-green-600 px-10 py-5 rounded-2xl font-bold text-xl hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 inline-flex items-center shadow-2xl"
+                            className="group bg-white text-green-600 hover:bg-gray-50 px-10 py-5 rounded-2xl font-bold text-xl transition-all duration-300 transform hover:scale-105 inline-flex items-center shadow-2xl"
                         >
                             Go to Dashboard
                             <ArrowRightIcon className="w-6 h-6 ml-3 group-hover:translate-x-1 transition-transform duration-300" />
@@ -417,7 +426,7 @@ const Welcome: React.FC<WelcomeProps> = ({ canLogin, canRegister, auth }) => {
                     ) : canRegister && (
                         <Link
                             href="/register"
-                            className="group bg-white text-green-600 px-10 py-5 rounded-2xl font-bold text-xl hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 inline-flex items-center shadow-2xl"
+                            className="group bg-white text-green-600 hover:bg-gray-50 px-10 py-5 rounded-2xl font-bold text-xl transition-all duration-300 transform hover:scale-105 inline-flex items-center shadow-2xl"
                         >
                             Start Free Today
                             <ArrowRightIcon className="w-6 h-6 ml-3 group-hover:translate-x-1 transition-transform duration-300" />

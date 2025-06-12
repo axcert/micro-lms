@@ -1,588 +1,525 @@
 import React, { useState } from 'react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { 
-  ArrowLeft, 
-  FileQuestion, 
-  Calendar, 
-  Clock, 
-  Users,
-  Settings,
-  BookOpen,
-  Bell,
-  LogOut,
-  Shield,
-  Eye,
-  Shuffle
-} from 'lucide-react';
+    ClipboardDocumentListIcon,
+    PlusIcon,
+    UserGroupIcon,
+    CalendarIcon,
+    ClockIcon,
+    ArrowLeftIcon,
+    ChartBarIcon,
+    Cog6ToothIcon,
+    DocumentDuplicateIcon,
+    TrashIcon,
+    EyeIcon,
+    PencilIcon,
+    PlayIcon,
+    StopIcon
+} from '@heroicons/react/24/outline';
 
 interface Batch {
-  id: number;
-  name: string;
-  student_count: number;
+    id: number;
+    name: string;
+    students_count: number;
 }
 
-interface FormData {
-  title: string;
-  description: string;
-  instructions: string;
-  batch_id: string;
-  total_marks: number | '';
-  pass_marks: number | '';
-  duration_minutes: number | '';
-  start_time: string;
-  end_time: string;
-  max_attempts: number | '';
-  shuffle_questions: boolean;
-  shuffle_options: boolean;
-  show_results_immediately: boolean;
-  allow_review: boolean;
-  auto_submit: boolean;
-  require_webcam: boolean;
-  prevent_copy_paste: boolean;
+interface Quiz {
+    id: number;
+    title: string;
+    description: string;
+    batch: {
+        name: string;
+    };
+    questions_count: number;
+    attempts_count: number;
+    duration: number;
+    start_time: string;
+    end_time: string;
+    status: 'active' | 'inactive' | 'completed';
+    created_at: string;
 }
 
-export default function CreateQuiz() {
-  const [formData, setFormData] = useState<FormData>({
-    title: '',
-    description: '',
-    instructions: '',
-    batch_id: '',
-    total_marks: '',
-    pass_marks: '',
-    duration_minutes: 60,
-    start_time: '',
-    end_time: '',
-    max_attempts: 1,
-    shuffle_questions: false,
-    shuffle_options: false,
-    show_results_immediately: true,
-    allow_review: true,
-    auto_submit: true,
-    require_webcam: false,
-    prevent_copy_paste: false
-  });
+interface CreateQuizProps {
+    batches?: Batch[];
+    quizzes?: Quiz[];
+}
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [processing, setProcessing] = useState(false);
+const Create: React.FC<CreateQuizProps> = ({ batches = [], quizzes = [] }) => {
+    const [activeTab, setActiveTab] = useState<'create' | 'manage'>('create');
+    const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Mock data
-  const mockBatches: Batch[] = [
-    { id: 1, name: "Mathematics Grade 10 - Morning", student_count: 28 },
-    { id: 2, name: "Physics Grade 11 - Afternoon", student_count: 25 },
-    { id: 3, name: "Chemistry Grade 12 - Evening", student_count: 20 },
-    { id: 4, name: "Biology Grade 9 - Morning", student_count: 22 }
-  ];
+    const { data, setData, post, processing, errors } = useForm({
+        title: '',
+        description: '',
+        batch_id: '',
+        start_time: '',
+        end_time: '',
+        duration: 60,
+        randomize_questions: true,
+        show_results_immediately: false,
+        allow_review: true,
+        max_attempts: 1,
+    });
 
-  const selectedBatch = mockBatches.find(batch => batch.id.toString() === formData.batch_id);
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        post('/teacher/quizzes');
+    };
 
-  const handleSubmit = () => {
-    setProcessing(true);
-    
-    // Simulate validation
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.title.trim()) {
-      newErrors.title = 'Quiz title is required.';
-    }
-    
-    if (!formData.batch_id) {
-      newErrors.batch_id = 'Please select a batch for this quiz.';
-    }
-    
-    if (formData.pass_marks && formData.total_marks && formData.pass_marks > formData.total_marks) {
-      newErrors.pass_marks = 'Pass marks cannot be greater than total marks.';
-    }
-    
-    if (formData.start_time && formData.end_time && new Date(formData.start_time) >= new Date(formData.end_time)) {
-      newErrors.end_time = 'End time must be after start time.';
-    }
-    
-    setErrors(newErrors);
-    
-    setTimeout(() => {
-      setProcessing(false);
-      if (Object.keys(newErrors).length === 0) {
-        alert('Quiz created successfully! Add questions to complete your quiz.');
-      }
-    }, 1000);
-  };
+    const navigateBack = () => {
+        router.visit('/teacher/dashboard');
+    };
 
-  const getTomorrowDate = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
-    return tomorrow.toISOString().slice(0, 16);
-  };
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'active': return 'bg-green-100 text-green-700 border-green-200';
+            case 'inactive': return 'bg-gray-100 text-gray-700 border-gray-200';
+            case 'completed': return 'bg-blue-100 text-blue-700 border-blue-200';
+            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+        }
+    };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 flex items-center">
-                <div className="h-8 w-8 bg-purple-600 rounded-lg flex items-center justify-center">
-                  <BookOpen className="h-5 w-5 text-white" />
-                </div>
-                <span className="ml-2 text-xl font-semibold text-gray-900">MicroLMS</span>
-              </div>
-            </div>
+    const getStatusIcon = (status: string) => {
+        switch (status) {
+            case 'active': return <PlayIcon className="w-4 h-4" />;
+            case 'inactive': return <StopIcon className="w-4 h-4" />;
+            case 'completed': return <ClipboardDocumentListIcon className="w-4 h-4" />;
+            default: return <ClockIcon className="w-4 h-4" />;
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-white">
+            <Head title="Quiz Management" />
             
-            <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-400 hover:text-gray-500">
-                <Bell className="h-5 w-5" />
-              </button>
-              <button className="p-2 text-gray-400 hover:text-gray-500">
-                <Settings className="h-5 w-5" />
-              </button>
-              <div className="flex items-center space-x-2">
-                <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-purple-600">JD</span>
-                </div>
-                <span className="text-sm font-medium text-gray-700">John Doe</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Sidebar */}
-      <div className="flex">
-        <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 md:pt-16">
-          <div className="flex-1 flex flex-col min-h-0 bg-white border-r border-gray-200">
-            <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
-              <nav className="mt-5 flex-1 px-2 space-y-1">
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                  <BookOpen className="text-gray-400 mr-3 h-5 w-5" />
-                  Batches
-                </a>
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                  <FileQuestion className="text-gray-400 mr-3 h-5 w-5" />
-                  Classes
-                </a>
-                <a href="#" className="bg-purple-100 text-purple-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                  <FileQuestion className="text-purple-500 mr-3 h-5 w-5" />
-                  Quizzes
-                </a>
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                  <Users className="text-gray-400 mr-3 h-5 w-5" />
-                  Students
-                </a>
-              </nav>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="md:pl-64 flex flex-col flex-1">
-          <main className="flex-1">
-            <div className="py-6">
-              <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
-                <div className="mb-6">
-                  <div className="flex items-center space-x-3">
-                    <button
-                      type="button"
-                      className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-1" />
-                      Back to Quizzes
-                    </button>
-                  </div>
-                  <h1 className="mt-2 text-2xl font-bold text-gray-900">Create New Quiz</h1>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Create an assessment for your students with questions and scoring
-                  </p>
-                </div>
-
-                {/* Form */}
-                <div className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-lg">
-                  <div className="space-y-6 p-6">
-                    {/* Basic Information */}
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                        <FileQuestion className="h-5 w-5 mr-2 text-purple-600" />
-                        Quiz Information
-                      </h3>
-                      
-                      <div className="grid grid-cols-1 gap-6">
-                        {/* Quiz Title */}
-                        <div>
-                          <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                            Quiz Title *
-                          </label>
-                          <input
-                            type="text"
-                            id="title"
-                            value={formData.title}
-                            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                            className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                              errors.title ? 'border-red-300' : 'border-gray-300'
-                            }`}
-                            placeholder="e.g., Quadratic Equations Assessment"
-                            required
-                          />
-                          {errors.title && (
-                            <p className="mt-1 text-sm text-red-600">{errors.title}</p>
-                          )}
-                        </div>
-
-                        {/* Description */}
-                        <div>
-                          <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                            Description
-                          </label>
-                          <textarea
-                            id="description"
-                            rows={3}
-                            value={formData.description}
-                            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                            placeholder="Brief description of what this quiz covers..."
-                          />
-                        </div>
-
-                        {/* Instructions */}
-                        <div>
-                          <label htmlFor="instructions" className="block text-sm font-medium text-gray-700">
-                            Instructions for Students
-                          </label>
-                          <textarea
-                            id="instructions"
-                            rows={4}
-                            value={formData.instructions}
-                            onChange={(e) => setFormData(prev => ({ ...prev, instructions: e.target.value }))}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                            placeholder="Instructions that students will see before starting the quiz..."
-                          />
-                        </div>
-
-                        {/* Batch Selection */}
-                        <div>
-                          <label htmlFor="batch_id" className="block text-sm font-medium text-gray-700">
-                            Select Batch *
-                          </label>
-                          <select
-                            id="batch_id"
-                            value={formData.batch_id}
-                            onChange={(e) => setFormData(prev => ({ ...prev, batch_id: e.target.value }))}
-                            className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                              errors.batch_id ? 'border-red-300' : 'border-gray-300'
-                            }`}
-                            required
-                          >
-                            <option value="">Choose a batch...</option>
-                            {mockBatches.map(batch => (
-                              <option key={batch.id} value={batch.id.toString()}>
-                                {batch.name} ({batch.student_count} students)
-                              </option>
-                            ))}
-                          </select>
-                          {errors.batch_id && (
-                            <p className="mt-1 text-sm text-red-600">{errors.batch_id}</p>
-                          )}
-                          
-                          {selectedBatch && (
-                            <div className="mt-2 p-3 bg-purple-50 rounded-md">
-                              <p className="text-sm text-purple-700">
-                                <Users className="inline h-4 w-4 mr-1" />
-                                {selectedBatch.student_count} students will have access to this quiz
-                              </p>
+            {/* Enhanced Header */}
+            <div className="bg-white shadow-lg border-b border-green-100">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between items-center py-6">
+                        <div className="flex items-center space-x-4">
+                            <button 
+                                onClick={navigateBack}
+                                className="p-2 hover:bg-green-50 rounded-lg transition-colors duration-200 group"
+                            >
+                                <ArrowLeftIcon className="w-6 h-6 text-green-600 group-hover:text-green-700" />
+                            </button>
+                            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
+                                <ClipboardDocumentListIcon className="w-6 h-6 text-white" />
                             </div>
-                          )}
+                            <div>
+                                <h1 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent">
+                                    Quiz Management
+                                </h1>
+                                <p className="text-gray-600">Create and manage quizzes for your students.</p>
+                            </div>
                         </div>
-                      </div>
+                        
+                        {/* Tab Navigation */}
+                        <div className="flex bg-green-50 rounded-lg p-1">
+                            <button
+                                onClick={() => setActiveTab('create')}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                                    activeTab === 'create'
+                                        ? 'bg-green-600 text-white shadow-lg'
+                                        : 'text-green-600 hover:bg-green-100'
+                                }`}
+                            >
+                                Create Quiz
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('manage')}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                                    activeTab === 'manage'
+                                        ? 'bg-green-600 text-white shadow-lg'
+                                        : 'text-green-600 hover:bg-green-100'
+                                }`}
+                            >
+                                Manage Quizzes
+                            </button>
+                        </div>
                     </div>
-
-                    {/* Scoring Settings */}
-                    <div className="border-t border-gray-200 pt-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                        <FileQuestion className="h-5 w-5 mr-2 text-purple-600" />
-                        Scoring
-                      </h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Total Marks */}
-                        <div>
-                          <label htmlFor="total_marks" className="block text-sm font-medium text-gray-700">
-                            Total Marks
-                          </label>
-                          <input
-                            type="number"
-                            id="total_marks"
-                            value={formData.total_marks}
-                            onChange={(e) => setFormData(prev => ({ ...prev, total_marks: e.target.value ? parseFloat(e.target.value) : '' }))}
-                            min="0"
-                            step="0.5"
-                            className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                              errors.total_marks ? 'border-red-300' : 'border-gray-300'
-                            }`}
-                            placeholder="e.g., 100"
-                          />
-                          <p className="mt-1 text-sm text-gray-500">
-                            Will be calculated automatically based on questions
-                          </p>
-                        </div>
-
-                        {/* Pass Marks */}
-                        <div>
-                          <label htmlFor="pass_marks" className="block text-sm font-medium text-gray-700">
-                            Pass Marks
-                          </label>
-                          <input
-                            type="number"
-                            id="pass_marks"
-                            value={formData.pass_marks}
-                            onChange={(e) => setFormData(prev => ({ ...prev, pass_marks: e.target.value ? parseFloat(e.target.value) : '' }))}
-                            min="0"
-                            step="0.5"
-                            className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                              errors.pass_marks ? 'border-red-300' : 'border-gray-300'
-                            }`}
-                            placeholder="e.g., 60"
-                          />
-                          {errors.pass_marks && (
-                            <p className="mt-1 text-sm text-red-600">{errors.pass_marks}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Timing Settings */}
-                    <div className="border-t border-gray-200 pt-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                        <Clock className="h-5 w-5 mr-2 text-purple-600" />
-                        Timing & Schedule
-                      </h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Duration */}
-                        <div>
-                          <label htmlFor="duration_minutes" className="block text-sm font-medium text-gray-700">
-                            Duration (minutes)
-                          </label>
-                          <select
-                            id="duration_minutes"
-                            value={formData.duration_minutes}
-                            onChange={(e) => setFormData(prev => ({ ...prev, duration_minutes: e.target.value ? parseInt(e.target.value) : '' }))}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                          >
-                            <option value="">No time limit</option>
-                            <option value={15}>15 minutes</option>
-                            <option value={30}>30 minutes</option>
-                            <option value={45}>45 minutes</option>
-                            <option value={60}>1 hour</option>
-                            <option value={90}>1.5 hours</option>
-                            <option value={120}>2 hours</option>
-                            <option value={180}>3 hours</option>
-                          </select>
-                        </div>
-
-                        {/* Max Attempts */}
-                        <div>
-                          <label htmlFor="max_attempts" className="block text-sm font-medium text-gray-700">
-                            Maximum Attempts
-                          </label>
-                          <select
-                            id="max_attempts"
-                            value={formData.max_attempts}
-                            onChange={(e) => setFormData(prev => ({ ...prev, max_attempts: e.target.value ? parseInt(e.target.value) : '' }))}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                          >
-                            <option value="">Unlimited</option>
-                            <option value={1}>1 attempt</option>
-                            <option value={2}>2 attempts</option>
-                            <option value={3}>3 attempts</option>
-                            <option value={5}>5 attempts</option>
-                          </select>
-                        </div>
-
-                        {/* Start Time */}
-                        <div>
-                          <label htmlFor="start_time" className="block text-sm font-medium text-gray-700">
-                            Start Time (Optional)
-                          </label>
-                          <input
-                            type="datetime-local"
-                            id="start_time"
-                            value={formData.start_time}
-                            onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
-                            min={getTomorrowDate()}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                          />
-                        </div>
-
-                        {/* End Time */}
-                        <div>
-                          <label htmlFor="end_time" className="block text-sm font-medium text-gray-700">
-                            End Time (Optional)
-                          </label>
-                          <input
-                            type="datetime-local"
-                            id="end_time"
-                            value={formData.end_time}
-                            onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
-                            min={formData.start_time || getTomorrowDate()}
-                            className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                              errors.end_time ? 'border-red-300' : 'border-gray-300'
-                            }`}
-                          />
-                          {errors.end_time && (
-                            <p className="mt-1 text-sm text-red-600">{errors.end_time}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Quiz Settings */}
-                    <div className="border-t border-gray-200 pt-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                        <Settings className="h-5 w-5 mr-2 text-purple-600" />
-                        Quiz Settings
-                      </h3>
-                      
-                      <div className="space-y-4">
-                        {/* Randomization */}
-                        <div className="bg-gray-50 p-4 rounded-md">
-                          <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                            <Shuffle className="h-4 w-4 mr-1" />
-                            Randomization
-                          </h4>
-                          <div className="space-y-3">
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.shuffle_questions}
-                                onChange={(e) => setFormData(prev => ({ ...prev, shuffle_questions: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Shuffle question order for each student
-                              </span>
-                            </label>
-                            
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.shuffle_options}
-                                onChange={(e) => setFormData(prev => ({ ...prev, shuffle_options: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Shuffle answer options for multiple choice questions
-                              </span>
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* Results & Review */}
-                        <div className="bg-gray-50 p-4 rounded-md">
-                          <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                            <Eye className="h-4 w-4 mr-1" />
-                            Results & Review
-                          </h4>
-                          <div className="space-y-3">
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.show_results_immediately}
-                                onChange={(e) => setFormData(prev => ({ ...prev, show_results_immediately: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Show results immediately after submission
-                              </span>
-                            </label>
-                            
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.allow_review}
-                                onChange={(e) => setFormData(prev => ({ ...prev, allow_review: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Allow students to review their answers after submission
-                              </span>
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* Security */}
-                        <div className="bg-gray-50 p-4 rounded-md">
-                          <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                            <Shield className="h-4 w-4 mr-1" />
-                            Security Settings
-                          </h4>
-                          <div className="space-y-3">
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.auto_submit}
-                                onChange={(e) => setFormData(prev => ({ ...prev, auto_submit: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Auto-submit when time expires
-                              </span>
-                            </label>
-                            
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.prevent_copy_paste}
-                                onChange={(e) => setFormData(prev => ({ ...prev, prevent_copy_paste: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Prevent copy and paste
-                              </span>
-                            </label>
-                            
-                            <label className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={formData.require_webcam}
-                                onChange={(e) => setFormData(prev => ({ ...prev, require_webcam: e.target.checked }))}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                              />
-                              <span className="ml-2 text-sm text-gray-700">
-                                Require webcam monitoring (experimental)
-                              </span>
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="border-t border-gray-200 pt-6">
-                      <div className="flex justify-end space-x-3">
-                        <button
-                          type="button"
-                          className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleSubmit}
-                          disabled={processing}
-                          className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 ${
-                            processing ? 'opacity-50 cursor-not-allowed' : ''
-                          }`}
-                        >
-                          {processing ? 'Creating...' : 'Create Quiz'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
                 </div>
-              </div>
             </div>
-          </main>
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {activeTab === 'create' ? (
+                    /* Create Quiz Section */
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Quiz Form */}
+                        <div className="lg:col-span-2">
+                            <div className="bg-white rounded-xl shadow-lg border border-green-100 p-6">
+                                <div className="flex items-center mb-6">
+                                    <div className="p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-lg mr-3">
+                                        <PlusIcon className="w-6 h-6 text-white" />
+                                    </div>
+                                    <h2 className="text-xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent">
+                                        Create New Quiz
+                                    </h2>
+                                </div>
+
+                                <form onSubmit={handleSubmit} className="space-y-6">
+                                    {/* Basic Information */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                Quiz Title
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={data.title}
+                                                onChange={(e) => setData('title', e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
+                                                placeholder="Enter quiz title..."
+                                            />
+                                            {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title}</p>}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                Select Batch
+                                            </label>
+                                            <select
+                                                value={data.batch_id}
+                                                onChange={(e) => setData('batch_id', e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
+                                            >
+                                                <option value="">Choose a batch...</option>
+                                                {batches.map((batch) => (
+                                                    <option key={batch.id} value={batch.id}>
+                                                        {batch.name} ({batch.students_count} students)
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {errors.batch_id && <p className="text-red-500 text-sm mt-1">{errors.batch_id}</p>}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Description
+                                        </label>
+                                        <textarea
+                                            value={data.description}
+                                            onChange={(e) => setData('description', e.target.value)}
+                                            rows={3}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
+                                            placeholder="Brief description of the quiz..."
+                                        />
+                                    </div>
+
+                                    {/* Timing */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                Start Time
+                                            </label>
+                                            <input
+                                                type="datetime-local"
+                                                value={data.start_time}
+                                                onChange={(e) => setData('start_time', e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                End Time
+                                            </label>
+                                            <input
+                                                type="datetime-local"
+                                                value={data.end_time}
+                                                onChange={(e) => setData('end_time', e.target.value)}
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                                Duration (minutes)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={data.duration}
+                                                onChange={(e) => setData('duration', parseInt(e.target.value))}
+                                                min="1"
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Advanced Settings Toggle */}
+                                    <div className="border-t pt-6">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAdvanced(!showAdvanced)}
+                                            className="flex items-center text-green-600 hover:text-green-700 font-medium transition-colors duration-200"
+                                        >
+                                            <Cog6ToothIcon className="w-5 h-5 mr-2" />
+                                            Advanced Settings
+                                            <div className={`ml-2 transform transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`}>
+                                                ▼
+                                            </div>
+                                        </button>
+
+                                        {showAdvanced && (
+                                            <div className="mt-4 space-y-4 bg-green-50 p-4 rounded-lg">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <label className="flex items-center space-x-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={data.randomize_questions}
+                                                            onChange={(e) => setData('randomize_questions', e.target.checked)}
+                                                            className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                                                        />
+                                                        <span className="text-sm font-medium text-gray-700">Randomize Questions</span>
+                                                    </label>
+
+                                                    <label className="flex items-center space-x-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={data.show_results_immediately}
+                                                            onChange={(e) => setData('show_results_immediately', e.target.checked)}
+                                                            className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                                                        />
+                                                        <span className="text-sm font-medium text-gray-700">Show Results Immediately</span>
+                                                    </label>
+
+                                                    <label className="flex items-center space-x-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={data.allow_review}
+                                                            onChange={(e) => setData('allow_review', e.target.checked)}
+                                                            className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                                                        />
+                                                        <span className="text-sm font-medium text-gray-700">Allow Answer Review</span>
+                                                    </label>
+
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                            Max Attempts
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            value={data.max_attempts}
+                                                            onChange={(e) => setData('max_attempts', parseInt(e.target.value))}
+                                                            min="1"
+                                                            max="10"
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Submit Button */}
+                                    <div className="flex justify-end pt-6">
+                                        <button
+                                            type="submit"
+                                            disabled={processing}
+                                            className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-8 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                                        >
+                                            {processing ? (
+                                                <>
+                                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                                                    Creating...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <PlusIcon className="w-5 h-5 mr-2" />
+                                                    Create Quiz
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        {/* Quick Stats Sidebar */}
+                        <div className="space-y-6">
+                            <div className="bg-white rounded-xl shadow-lg border border-green-100 p-6">
+                                <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Stats</h3>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                                        <div className="flex items-center">
+                                            <ClipboardDocumentListIcon className="w-5 h-5 text-green-600 mr-2" />
+                                            <span className="text-sm font-medium text-green-700">Total Quizzes</span>
+                                        </div>
+                                        <span className="text-xl font-bold text-green-600">{quizzes.length}</span>
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                                        <div className="flex items-center">
+                                            <UserGroupIcon className="w-5 h-5 text-blue-600 mr-2" />
+                                            <span className="text-sm font-medium text-blue-700">Active Batches</span>
+                                        </div>
+                                        <span className="text-xl font-bold text-blue-600">{batches.length}</span>
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                                        <div className="flex items-center">
+                                            <ChartBarIcon className="w-5 h-5 text-purple-600 mr-2" />
+                                            <span className="text-sm font-medium text-purple-700">Total Students</span>
+                                        </div>
+                                        <span className="text-xl font-bold text-purple-600">
+                                            {batches.reduce((total, batch) => total + batch.students_count, 0)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg text-white p-6">
+                                <h3 className="text-lg font-bold mb-3">💡 Quick Tips</h3>
+                                <ul className="space-y-2 text-sm text-green-100">
+                                    <li>• Set clear instructions in the description</li>
+                                    <li>• Randomize questions to prevent cheating</li>
+                                    <li>• Give appropriate time for each question</li>
+                                    <li>• Test your quiz before publishing</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    /* Manage Quizzes Section */
+                    <div className="space-y-6">
+                        {/* Quiz Statistics Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <div className="bg-white rounded-xl shadow-lg border border-green-100 p-6 hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                                <div className="flex items-center">
+                                    <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-lg">
+                                        <ClipboardDocumentListIcon className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div className="ml-4">
+                                        <p className="text-2xl font-bold text-green-600">{quizzes.length}</p>
+                                        <p className="text-sm text-gray-600">Total Quizzes</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-lg border border-blue-100 p-6 hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                                <div className="flex items-center">
+                                    <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg">
+                                        <PlayIcon className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div className="ml-4">
+                                        <p className="text-2xl font-bold text-blue-600">
+                                            {quizzes.filter(q => q.status === 'active').length}
+                                        </p>
+                                        <p className="text-sm text-gray-600">Active Quizzes</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-lg border border-purple-100 p-6 hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                                <div className="flex items-center">
+                                    <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg">
+                                        <ChartBarIcon className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div className="ml-4">
+                                        <p className="text-2xl font-bold text-purple-600">
+                                            {quizzes.reduce((total, quiz) => total + quiz.attempts_count, 0)}
+                                        </p>
+                                        <p className="text-sm text-gray-600">Total Attempts</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-lg border border-orange-100 p-6 hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                                <div className="flex items-center">
+                                    <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg">
+                                        <ClockIcon className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div className="ml-4">
+                                        <p className="text-2xl font-bold text-orange-600">
+                                            {Math.round(quizzes.reduce((total, quiz) => total + quiz.duration, 0) / quizzes.length) || 0}
+                                        </p>
+                                        <p className="text-sm text-gray-600">Avg Duration</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Quiz List */}
+                        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                                <h3 className="text-lg font-bold text-gray-900">Quiz List</h3>
+                            </div>
+                            
+                            {quizzes.length > 0 ? (
+                                <div className="divide-y divide-gray-200">
+                                    {quizzes.map((quiz, index) => (
+                                        <div key={quiz.id} className="p-6 hover:bg-gray-50 transition-colors duration-200">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center space-x-3 mb-2">
+                                                        <h4 className="text-lg font-semibold text-gray-900">{quiz.title}</h4>
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(quiz.status)}`}>
+                                                            {getStatusIcon(quiz.status)}
+                                                            <span className="ml-1 capitalize">{quiz.status}</span>
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    <p className="text-gray-600 mb-3">{quiz.description}</p>
+                                                    
+                                                    <div className="flex items-center space-x-6 text-sm text-gray-500">
+                                                        <div className="flex items-center">
+                                                            <UserGroupIcon className="w-4 h-4 mr-1" />
+                                                            {quiz.batch.name}
+                                                        </div>
+                                                        <div className="flex items-center">
+                                                            <ClipboardDocumentListIcon className="w-4 h-4 mr-1" />
+                                                            {quiz.questions_count} questions
+                                                        </div>
+                                                        <div className="flex items-center">
+                                                            <ChartBarIcon className="w-4 h-4 mr-1" />
+                                                            {quiz.attempts_count} attempts
+                                                        </div>
+                                                        <div className="flex items-center">
+                                                            <ClockIcon className="w-4 h-4 mr-1" />
+                                                            {quiz.duration} min
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex items-center space-x-2 ml-6">
+                                                    <button className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors duration-200">
+                                                        <EyeIcon className="w-5 h-5" />
+                                                    </button>
+                                                    <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors duration-200">
+                                                        <PencilIcon className="w-5 h-5" />
+                                                    </button>
+                                                    <button className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors duration-200">
+                                                        <DocumentDuplicateIcon className="w-5 h-5" />
+                                                    </button>
+                                                    <button className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200">
+                                                        <TrashIcon className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-12">
+                                    <ClipboardDocumentListIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">No quizzes yet</h3>
+                                    <p className="text-gray-500 mb-6">Create your first quiz to get started with assessments.</p>
+                                    <button
+                                        onClick={() => setActiveTab('create')}
+                                        className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg font-medium hover:from-green-700 hover:to-green-800 transition-all duration-200"
+                                    >
+                                        <PlusIcon className="w-5 h-5 inline mr-2" />
+                                        Create Your First Quiz
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
-      </div>
-    </div>
-  );
-}
+    );
+};
+
+export default Create;
