@@ -17,13 +17,19 @@ import {
   AlertCircle,
   BookOpen,
   Bell,
+  Trash2,
+  FileText,
+  BarChart3,
   Settings,
-  LogOut
+  LogOut,
+  Menu,
+  X
 } from 'lucide-react';
 
 interface Batch {
   id: number;
   name: string;
+  student_count: number;
 }
 
 interface Class {
@@ -33,17 +39,10 @@ interface Class {
   scheduled_at: string;
   duration_minutes: number;
   status: 'scheduled' | 'live' | 'completed' | 'cancelled' | 'rescheduled';
-  zoom_join_url: string | null;
-  zoom_start_url: string | null;
-  attendance_count: number;
-  batch: {
-    id: number;
-    name: string;
-    student_count: number;
-  };
-  is_upcoming: boolean;
-  can_start: boolean;
-  formatted_duration: string;
+  zoom_link: string | null;
+  batch: Batch;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Stats {
@@ -53,105 +52,98 @@ interface Stats {
   classes_today: number;
 }
 
-export default function TeacherClassesIndex() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [batchFilter, setBatchFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+}
 
-  // Mock data
-  const stats: Stats = {
-    total_classes: 48,
+interface Props {
+  classes: {
+    data: Class[];
+    links: any;
+    meta: any;
+  };
+  stats: Stats;
+  auth: {
+    user: User;
+  };
+  flash?: {
+    success?: string;
+    error?: string;
+  };
+}
+
+export default function ClassesIndex() {
+  // Mock data for demonstration
+  const mockClasses = {
+    data: [
+      {
+        id: 1,
+        title: "Advanced React Concepts",
+        description: "Deep dive into React hooks, context, and performance optimization",
+        scheduled_at: "2025-06-18T10:00:00",
+        duration_minutes: 90,
+        status: 'scheduled' as const,
+        zoom_link: "https://zoom.us/j/123456789",
+        batch: { id: 1, name: "Frontend Batch A", student_count: 25 },
+        created_at: "2025-06-15T08:00:00",
+        updated_at: "2025-06-16T10:30:00"
+      },
+      {
+        id: 2,
+        title: "Database Design Principles",
+        description: "Learn about normalization, indexing, and query optimization",
+        scheduled_at: "2025-06-17T14:00:00",
+        duration_minutes: 120,
+        status: 'live' as const,
+        zoom_link: "https://zoom.us/j/987654321",
+        batch: { id: 2, name: "Backend Batch B", student_count: 18 },
+        created_at: "2025-06-10T09:00:00",
+        updated_at: "2025-06-17T13:45:00"
+      },
+      {
+        id: 3,
+        title: "Introduction to TypeScript",
+        description: "Getting started with TypeScript for better code quality",
+        scheduled_at: "2025-06-16T16:00:00",
+        duration_minutes: 75,
+        status: 'completed' as const,
+        zoom_link: null,
+        batch: { id: 1, name: "Frontend Batch A", student_count: 25 },
+        created_at: "2025-06-12T11:00:00",
+        updated_at: "2025-06-16T17:30:00"
+      }
+    ],
+    links: [],
+    meta: {}
+  };
+
+  const mockStats = {
+    total_classes: 45,
     upcoming_classes: 12,
-    completed_classes: 32,
+    completed_classes: 30,
     classes_today: 3
   };
 
-  const mockBatches: Batch[] = [
-    { id: 1, name: "Mathematics Grade 10 - Morning" },
-    { id: 2, name: "Physics Grade 11 - Afternoon" },
-    { id: 3, name: "Chemistry Grade 12 - Evening" },
-    { id: 4, name: "Biology Grade 9 - Morning" }
-  ];
-
-  const mockClasses: Class[] = [
-    {
+  const mockAuth = {
+    user: {
       id: 1,
-      title: "Quadratic Equations - Advanced Problems",
-      description: "Solving complex quadratic equations and real-world applications",
-      scheduled_at: "2024-06-05T10:00:00Z",
-      duration_minutes: 90,
-      status: "scheduled",
-      zoom_join_url: "https://zoom.us/j/123456789",
-      zoom_start_url: "https://zoom.us/s/123456789",
-      attendance_count: 0,
-      batch: { id: 1, name: "Mathematics Grade 10 - Morning", student_count: 28 },
-      is_upcoming: true,
-      can_start: false,
-      formatted_duration: "1h 30m"
-    },
-    {
-      id: 2,
-      title: "Newton's Laws of Motion",
-      description: "Understanding the three fundamental laws of motion",
-      scheduled_at: "2024-06-04T14:30:00Z",
-      duration_minutes: 60,
-      status: "live",
-      zoom_join_url: "https://zoom.us/j/987654321",
-      zoom_start_url: "https://zoom.us/s/987654321",
-      attendance_count: 23,
-      batch: { id: 2, name: "Physics Grade 11 - Afternoon", student_count: 25 },
-      is_upcoming: false,
-      can_start: false,
-      formatted_duration: "1h"
-    },
-    {
-      id: 3,
-      title: "Organic Chemistry Basics",
-      description: "Introduction to carbon compounds and functional groups",
-      scheduled_at: "2024-06-03T18:00:00Z",
-      duration_minutes: 75,
-      status: "completed",
-      zoom_join_url: null,
-      zoom_start_url: null,
-      attendance_count: 18,
-      batch: { id: 3, name: "Chemistry Grade 12 - Evening", student_count: 20 },
-      is_upcoming: false,
-      can_start: false,
-      formatted_duration: "1h 15m"
-    },
-    {
-      id: 4,
-      title: "Cell Structure and Function",
-      description: "Exploring the basic unit of life - the cell",
-      scheduled_at: "2024-06-06T09:00:00Z",
-      duration_minutes: 45,
-      status: "scheduled",
-      zoom_join_url: "https://zoom.us/j/456789123",
-      zoom_start_url: "https://zoom.us/s/456789123",
-      attendance_count: 0,
-      batch: { id: 4, name: "Biology Grade 9 - Morning", student_count: 22 },
-      is_upcoming: true,
-      can_start: true,
-      formatted_duration: "45m"
-    },
-    {
-      id: 5,
-      title: "Algebra Review Session",
-      description: "Review of key algebraic concepts before the exam",
-      scheduled_at: "2024-06-02T11:00:00Z",
-      duration_minutes: 120,
-      status: "cancelled",
-      zoom_join_url: null,
-      zoom_start_url: null,
-      attendance_count: 0,
-      batch: { id: 1, name: "Mathematics Grade 10 - Morning", student_count: 28 },
-      is_upcoming: false,
-      can_start: false,
-      formatted_duration: "2h"
+      name: "Sarah Johnson",
+      email: "sarah.j@microlms.com",
+      role: "teacher"
     }
-  ];
+  };
+
+  const classes = mockClasses;
+  const stats = mockStats;
+  const auth = mockAuth;
+  const flash = undefined;
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [showDropdown, setShowDropdown] = useState<number | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-US', {
@@ -163,468 +155,547 @@ export default function TeacherClassesIndex() {
     });
   };
 
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours === 0) return `${mins}m`;
+    if (mins === 0) return `${hours}h`;
+    return `${hours}h ${mins}m`;
+  };
+
   const getStatusInfo = (status: string) => {
     switch (status) {
       case 'scheduled':
-        return { icon: Clock, color: 'text-blue-600 bg-blue-100', text: 'Scheduled' };
+        return { icon: Clock, color: 'text-blue-600 bg-blue-50 border-blue-200', text: 'Scheduled' };
       case 'live':
-        return { icon: Play, color: 'text-red-600 bg-red-100', text: 'Live' };
+        return { icon: Play, color: 'text-red-600 bg-red-50 border-red-200', text: 'Live' };
       case 'completed':
-        return { icon: CheckCircle, color: 'text-green-600 bg-green-100', text: 'Completed' };
+        return { icon: CheckCircle, color: 'text-green-600 bg-green-50 border-green-200', text: 'Completed' };
       case 'cancelled':
-        return { icon: XCircle, color: 'text-gray-600 bg-gray-100', text: 'Cancelled' };
+        return { icon: XCircle, color: 'text-gray-600 bg-gray-50 border-gray-200', text: 'Cancelled' };
       case 'rescheduled':
-        return { icon: AlertCircle, color: 'text-yellow-600 bg-yellow-100', text: 'Rescheduled' };
+        return { icon: AlertCircle, color: 'text-yellow-600 bg-yellow-50 border-yellow-200', text: 'Rescheduled' };
       default:
-        return { icon: Clock, color: 'text-gray-600 bg-gray-100', text: status };
+        return { icon: Clock, color: 'text-gray-600 bg-gray-50 border-gray-200', text: status };
     }
   };
 
-  const filteredClasses = mockClasses.filter(class_item => {
+  const filteredClasses = classes.data.filter(class_item => {
     const matchesSearch = class_item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          class_item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          class_item.batch.name.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = !statusFilter || class_item.status === statusFilter;
-    const matchesBatch = !batchFilter || class_item.batch.id.toString() === batchFilter;
     
-    return matchesSearch && matchesStatus && matchesBatch;
+    return matchesSearch && matchesStatus;
   });
 
+  const handleDelete = (classId: number) => {
+    if (confirm('Are you sure you want to delete this class?')) {
+      alert(`Delete class ${classId} - Feature would be implemented with backend`);
+    }
+  };
+
+  const canStart = (class_item: Class) => {
+    const now = new Date();
+    const scheduledTime = new Date(class_item.scheduled_at);
+    const timeDiff = scheduledTime.getTime() - now.getTime();
+    return timeDiff <= 15 * 60 * 1000 && timeDiff >= -30 * 60 * 1000 && class_item.status === 'scheduled';
+  };
+
+  const handleJoinClass = (zoomLink: string) => {
+    if (zoomLink) {
+      window.open(zoomLink, '_blank');
+    }
+  };
+
+  const handleLogout = () => {
+    alert('Logout functionality would be implemented');
+  };
+
+  const handleNavigation = (path: string) => {
+    alert(`Navigate to: ${path}`);
+  };
+
+  const navigationItems = [
+    { name: 'Dashboard', icon: BarChart3, href: '/teacher/dashboard', current: false },
+    { name: 'Batches', icon: Users, href: '/teacher/batches', current: false },
+    { name: 'Classes', icon: Video, href: '/teacher/classes', current: true },
+    { name: 'Quizzes', icon: FileText, href: '/teacher/quizzes', current: false },
+    { name: 'Attendance', icon: CheckCircle, href: '/teacher/attendance', current: false },
+    { name: 'Reports', icon: BarChart3, href: '/teacher/reports', current: false },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      
+      {/* Flash Messages */}
+      {flash?.success && (
+        <div className="fixed top-4 right-4 z-50 bg-green-50 border border-green-200 text-green-800 px-6 py-4 rounded-xl shadow-lg backdrop-blur-sm">
+          <div className="flex items-center">
+            <CheckCircle className="h-5 w-5 mr-3 text-green-600" />
+            {flash.success}
+          </div>
+        </div>
+      )}
+      {flash?.error && (
+        <div className="fixed top-4 right-4 z-50 bg-red-50 border border-red-200 text-red-800 px-6 py-4 rounded-xl shadow-lg backdrop-blur-sm">
+          <div className="flex items-center">
+            <XCircle className="h-5 w-5 mr-3 text-red-600" />
+            {flash.error}
+          </div>
+        </div>
+      )}
+      
       {/* Navigation Header */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
+      <nav className="bg-white/90 backdrop-blur-md shadow-sm border-b border-gray-200/50 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <div className="flex-shrink-0 flex items-center">
-                <div className="h-8 w-8 bg-purple-600 rounded-lg flex items-center justify-center">
-                  <BookOpen className="h-5 w-5 text-white" />
+                <div className="h-10 w-10 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <BookOpen className="h-6 w-6 text-white" />
                 </div>
-                <span className="ml-2 text-xl font-semibold text-gray-900">MicroLMS</span>
+                <span className="ml-3 text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">MicroLMS</span>
               </div>
             </div>
             
             <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-400 hover:text-gray-500">
+              <button className="md:hidden p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
                 <Bell className="h-5 w-5" />
               </button>
-              <button className="p-2 text-gray-400 hover:text-gray-500">
-                <Settings className="h-5 w-5" />
+              <button 
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="md:hidden p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
-              <div className="flex items-center space-x-2">
-                <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-purple-600">JD</span>
+              <div className="hidden md:flex items-center space-x-4">
+                <button className="p-2 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                  <Bell className="h-5 w-5" />
+                </button>
+                <div className="flex items-center space-x-3">
+                  <div className="h-10 w-10 bg-gradient-to-br from-green-100 to-green-200 rounded-full flex items-center justify-center shadow-sm">
+                    <span className="text-sm font-semibold text-green-700">
+                      {auth.user.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-gray-800">{auth.user.name}</span>
+                    <span className="text-xs text-gray-500 capitalize">{auth.user.role}</span>
+                  </div>
+                  <button 
+                    onClick={handleLogout}
+                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </button>
                 </div>
-                <span className="text-sm font-medium text-gray-700">John Doe</span>
               </div>
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Sidebar */}
-      <div className="flex">
-        <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 md:pt-16">
-          <div className="flex-1 flex flex-col min-h-0 bg-white border-r border-gray-200">
-            <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
-              <nav className="mt-5 flex-1 px-2 space-y-1">
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                  <BookOpen className="text-gray-400 mr-3 h-5 w-5" />
-                  Batches
-                </a>
-                <a href="#" className="bg-purple-100 text-purple-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                  <Video className="text-purple-500 mr-3 h-5 w-5" />
-                  Classes
-                </a>
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                  <BookOpen className="text-gray-400 mr-3 h-5 w-5" />
-                  Quizzes
-                </a>
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                  <Users className="text-gray-400 mr-3 h-5 w-5" />
-                  Students
-                </a>
-              </nav>
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
+          <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div className="flex items-center">
+                <div className="h-8 w-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                  <BookOpen className="h-5 w-5 text-white" />
+                </div>
+                <span className="ml-2 text-lg font-bold text-gray-900">MicroLMS</span>
+              </div>
+              <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-500 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <nav className="mt-5 px-2 space-y-1">
+              {navigationItems.map((item) => (
+                <button
+                  key={item.name}
+                  onClick={() => {
+                    handleNavigation(item.href);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`${
+                    item.current
+                      ? 'bg-green-50 text-green-700 border-r-2 border-green-500'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  } group flex items-center px-3 py-3 text-sm font-medium rounded-lg w-full text-left transition-colors`}
+                >
+                  <item.icon className={`${item.current ? 'text-green-500' : 'text-gray-400'} mr-3 h-5 w-5`} />
+                  {item.name}
+                </button>
+              ))}
+            </nav>
+            <div className="absolute bottom-4 left-0 right-0 px-2">
+              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                <div className="h-8 w-8 bg-gradient-to-br from-green-100 to-green-200 rounded-full flex items-center justify-center">
+                  <span className="text-xs font-semibold text-green-700">
+                    {auth.user.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{auth.user.name}</p>
+                  <p className="text-xs text-gray-500 capitalize">{auth.user.role}</p>
+                </div>
+                <button onClick={handleLogout} className="p-1 text-gray-400 hover:text-gray-600">
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Main Content */}
-        <div className="md:pl-64 flex flex-col flex-1">
-          <main className="flex-1">
-            <div className="py-6">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
-                <div className="md:flex md:items-center md:justify-between mb-6">
-                  <div className="flex-1 min-w-0">
-                    <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-                      My Classes
-                    </h2>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Schedule and manage your online classes
-                    </p>
-                  </div>
-                  <div className="mt-4 flex md:mt-0 md:ml-4 space-x-3">
-                    <button
-                      type="button"
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Export
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                    >
-                      <Plus className="-ml-1 mr-2 h-5 w-5" />
-                      Schedule Class
-                    </button>
-                  </div>
+      {/* Sidebar */}
+      <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 md:pt-16">
+        <div className="flex-1 flex flex-col min-h-0 bg-white/90 backdrop-blur-md border-r border-gray-200/50">
+          <div className="flex-1 flex flex-col pt-6 pb-4 overflow-y-auto">
+            <nav className="mt-5 flex-1 px-3 space-y-2">
+              {navigationItems.map((item) => (
+                <button
+                  key={item.name}
+                  onClick={() => handleNavigation(item.href)}
+                  className={`${
+                    item.current
+                      ? 'bg-green-50 text-green-700 border-r-2 border-green-500 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  } group flex items-center px-3 py-3 text-sm font-medium rounded-lg w-full text-left transition-all duration-200`}
+                >
+                  <item.icon className={`${item.current ? 'text-green-500' : 'text-gray-400 group-hover:text-gray-500'} mr-3 h-5 w-5 transition-colors`} />
+                  {item.name}
+                </button>
+              ))}
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="md:pl-64 flex flex-col flex-1">
+        <main className="flex-1">
+          <div className="py-6 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-8">
+                <div>
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">My Classes</h1>
+                  <p className="mt-2 text-sm text-gray-600">Manage and schedule your classes with ease</p>
                 </div>
+                <button
+                  onClick={() => handleNavigation('/teacher/classes/create')}
+                  className="mt-4 sm:mt-0 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-6 py-3 rounded-xl flex items-center shadow-lg hover:shadow-xl transition-all duration-200 font-medium"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  New Class
+                </button>
+              </div>
 
-                {/* Success Message */}
-                <div className="mb-4 rounded-md bg-green-50 p-4">
-                  <div className="flex">
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-green-800">
-                        Class "Quadratic Equations" scheduled successfully!
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Stats Cards */}
-                <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="p-5">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <Video className="h-6 w-6 text-purple-400" />
-                        </div>
-                        <div className="ml-5 w-0 flex-1">
-                          <dl>
-                            <dt className="text-sm font-medium text-gray-500 truncate">
-                              Total Classes
-                            </dt>
-                            <dd className="text-lg font-medium text-gray-900">
-                              {stats.total_classes}
-                            </dd>
-                          </dl>
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div className="bg-white/80 backdrop-blur-sm overflow-hidden shadow-lg rounded-2xl border border-gray-200/50 hover:shadow-xl transition-all duration-300">
+                  <div className="p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="h-12 w-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center">
+                          <Video className="h-6 w-6 text-blue-600" />
                         </div>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="p-5">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <Clock className="h-6 w-6 text-blue-400" />
-                        </div>
-                        <div className="ml-5 w-0 flex-1">
-                          <dl>
-                            <dt className="text-sm font-medium text-gray-500 truncate">
-                              Upcoming
-                            </dt>
-                            <dd className="text-lg font-medium text-gray-900">
-                              {stats.upcoming_classes}
-                            </dd>
-                          </dl>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="p-5">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <CheckCircle className="h-6 w-6 text-green-400" />
-                        </div>
-                        <div className="ml-5 w-0 flex-1">
-                          <dl>
-                            <dt className="text-sm font-medium text-gray-500 truncate">
-                              Completed
-                            </dt>
-                            <dd className="text-lg font-medium text-gray-900">
-                              {stats.completed_classes}
-                            </dd>
-                          </dl>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="p-5">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                          <Calendar className="h-6 w-6 text-yellow-400" />
-                        </div>
-                        <div className="ml-5 w-0 flex-1">
-                          <dl>
-                            <dt className="text-sm font-medium text-gray-500 truncate">
-                              Today
-                            </dt>
-                            <dd className="text-lg font-medium text-gray-900">
-                              {stats.classes_today}
-                            </dd>
-                          </dl>
-                        </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500">Total Classes</dt>
+                          <dd className="text-2xl font-bold text-gray-900">{stats.total_classes}</dd>
+                        </dl>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Filters */}
-                <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                    <div className="lg:col-span-2">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <input
-                          type="text"
-                          placeholder="Search classes..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                        />
+                <div className="bg-white/80 backdrop-blur-sm overflow-hidden shadow-lg rounded-2xl border border-gray-200/50 hover:shadow-xl transition-all duration-300">
+                  <div className="p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="h-12 w-12 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl flex items-center justify-center">
+                          <Clock className="h-6 w-6 text-yellow-600" />
+                        </div>
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500">Upcoming</dt>
+                          <dd className="text-2xl font-bold text-gray-900">{stats.upcoming_classes}</dd>
+                        </dl>
                       </div>
                     </div>
-                    
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md"
-                    >
-                      <option value="">All Status</option>
-                      <option value="scheduled">Scheduled</option>
-                      <option value="live">Live</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                    
-                    <select
-                      value={batchFilter}
-                      onChange={(e) => setBatchFilter(e.target.value)}
-                      className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md"
-                    >
-                      <option value="">All Batches</option>
-                      {mockBatches.map(batch => (
-                        <option key={batch.id} value={batch.id.toString()}>
-                          {batch.name}
-                        </option>
-                      ))}
-                    </select>
-                    
-                    <div className="flex space-x-2">
-                      <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-                        placeholder="From date"
-                      />
-                    </div>
                   </div>
                 </div>
 
-                {/* Classes List */}
-                <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                  {filteredClasses.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Video className="mx-auto h-12 w-12 text-gray-400" />
-                      <h3 className="mt-2 text-sm font-medium text-gray-900">No classes found</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        {searchTerm || statusFilter || batchFilter 
-                          ? "Try adjusting your search or filter criteria."
-                          : "Get started by scheduling your first class."
-                        }
-                      </p>
-                      {!searchTerm && !statusFilter && !batchFilter && (
-                        <div className="mt-6">
-                          <button
-                            type="button"
-                            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                          >
-                            <Plus className="-ml-1 mr-2 h-5 w-5" />
-                            Schedule Your First Class
-                          </button>
+                <div className="bg-white/80 backdrop-blur-sm overflow-hidden shadow-lg rounded-2xl border border-gray-200/50 hover:shadow-xl transition-all duration-300">
+                  <div className="p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="h-12 w-12 bg-gradient-to-br from-green-100 to-green-200 rounded-xl flex items-center justify-center">
+                          <CheckCircle className="h-6 w-6 text-green-600" />
                         </div>
-                      )}
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500">Completed</dt>
+                          <dd className="text-2xl font-bold text-gray-900">{stats.completed_classes}</dd>
+                        </dl>
+                      </div>
                     </div>
-                  ) : (
-                    <ul className="divide-y divide-gray-200">
-                      {filteredClasses.map((class_item) => {
-                        const statusInfo = getStatusInfo(class_item.status);
-                        const StatusIcon = statusInfo.icon;
-                        
-                        return (
-                          <li key={class_item.id} className="hover:bg-gray-50 transition-colors">
-                            <div className="px-4 py-4 sm:px-6">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center min-w-0 flex-1">
-                                  <div className="flex-shrink-0">
-                                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                                      class_item.status === 'live' ? 'bg-red-100' :
-                                      class_item.status === 'completed' ? 'bg-green-100' :
-                                      class_item.status === 'cancelled' ? 'bg-gray-100' :
-                                      'bg-purple-100'
-                                    }`}>
-                                      <StatusIcon className={`h-5 w-5 ${
-                                        class_item.status === 'live' ? 'text-red-600' :
-                                        class_item.status === 'completed' ? 'text-green-600' :
-                                        class_item.status === 'cancelled' ? 'text-gray-400' :
-                                        'text-purple-600'
-                                      }`} />
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="ml-4 min-w-0 flex-1">
-                                    <div className="flex items-center space-x-2">
-                                      <button
-                                        type="button"
-                                        className="text-sm font-medium text-gray-900 hover:text-purple-600 truncate text-left"
-                                      >
-                                        {class_item.title}
-                                      </button>
-                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
-                                        {statusInfo.text}
-                                      </span>
-                                      {class_item.can_start && (
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                          Can Start
-                                        </span>
-                                      )}
-                                    </div>
-                                    
-                                    <div className="mt-1">
-                                      <p className="text-sm text-gray-500 truncate">
-                                        {class_item.description}
-                                      </p>
-                                      <p className="text-xs text-gray-400 mt-1">
-                                        {class_item.batch.name}
-                                      </p>
-                                    </div>
-                                    
-                                    <div className="mt-2 flex items-center space-x-4 text-sm text-gray-500">
-                                      <div className="flex items-center">
-                                        <Calendar className="flex-shrink-0 mr-1.5 h-4 w-4" />
-                                        {formatDateTime(class_item.scheduled_at)}
-                                      </div>
-                                      
-                                      <div className="flex items-center">
-                                        <Clock className="flex-shrink-0 mr-1.5 h-4 w-4" />
-                                        {class_item.formatted_duration}
-                                      </div>
-                                      
-                                      <div className="flex items-center">
-                                        <Users className="flex-shrink-0 mr-1.5 h-4 w-4" />
-                                        {class_item.attendance_count}/{class_item.batch.student_count} attended
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                                
-                                {/* Actions */}
-                                <div className="flex items-center space-x-2 ml-4">
-                                  {class_item.can_start && class_item.zoom_start_url && (
-                                    <button
-                                      type="button"
-                                      className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                                    >
-                                      <Play className="h-4 w-4 mr-1" />
-                                      Start
-                                    </button>
-                                  )}
-                                  
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center p-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </button>
-                                  
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center p-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </button>
-                                  
-                                  <div className="relative">
-                                    <button
-                                      type="button"
-                                      className="inline-flex items-center p-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                                    >
-                                      <MoreVertical className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
+                  </div>
                 </div>
 
-                {/* Pagination */}
-                <div className="mt-6 bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 rounded-lg shadow-sm">
-                  <div className="flex-1 flex justify-between sm:hidden">
-                    <button
-                      type="button"
-                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      type="button"
-                      className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                    >
-                      Next
-                    </button>
-                  </div>
-                  
-                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm text-gray-700">
-                        Showing <span className="font-medium">1</span> to <span className="font-medium">{filteredClasses.length}</span> of{' '}
-                        <span className="font-medium">{filteredClasses.length}</span> results
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                        <button
-                          type="button"
-                          className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                        >
-                          Previous
-                        </button>
-                        <button
-                          type="button"
-                          className="z-10 bg-purple-50 border-purple-500 text-purple-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium"
-                        >
-                          1
-                        </button>
-                        <button
-                          type="button"
-                          className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                        >
-                          Next
-                        </button>
-                      </nav>
+                <div className="bg-white/80 backdrop-blur-sm overflow-hidden shadow-lg rounded-2xl border border-gray-200/50 hover:shadow-xl transition-all duration-300">
+                  <div className="p-6">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="h-12 w-12 bg-gradient-to-br from-purple-100 to-purple-200 rounded-xl flex items-center justify-center">
+                          <Calendar className="h-6 w-6 text-purple-600" />
+                        </div>
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dl>
+                          <dt className="text-sm font-medium text-gray-500">Today</dt>
+                          <dd className="text-2xl font-bold text-gray-900">{stats.classes_today}</dd>
+                        </dl>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Search and Filter */}
+              <div className="bg-white/80 backdrop-blur-sm shadow-lg rounded-2xl mb-8 border border-gray-200/50">
+                <div className="p-6">
+                  <div className="flex flex-col lg:flex-row gap-4">
+                    <div className="flex-1">
+                      <div className="relative">
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                        <input
+                          type="text"
+                          placeholder="Search classes, descriptions, or batches..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-12 pr-4 py-3 border border-gray-200 rounded-xl w-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-50/50 backdrop-blur-sm transition-all duration-200"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-50/50 backdrop-blur-sm transition-all duration-200 min-w-[140px]"
+                      >
+                        <option value="">All Status</option>
+                        <option value="scheduled">Scheduled</option>
+                        <option value="live">Live</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="rescheduled">Rescheduled</option>
+                      </select>
+                      <button className="px-6 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 flex items-center justify-center transition-all duration-200 bg-gray-50/50 backdrop-blur-sm font-medium">
+                        <Download className="h-4 w-4 mr-2" />
+                        Export
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Classes Table */}
+              <div className="bg-white/80 backdrop-blur-sm shadow-lg rounded-2xl overflow-hidden border border-gray-200/50">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200/50">
+                    <thead className="bg-gray-50/80 backdrop-blur-sm">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Class Details
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Batch
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Schedule
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Duration
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white/50 backdrop-blur-sm divide-y divide-gray-200/50">
+                      {filteredClasses.map((class_item) => {
+                        const StatusIcon = getStatusInfo(class_item.status).icon;
+                        return (
+                          <tr key={class_item.id} className="hover:bg-gray-50/80 transition-colors duration-200">
+                            <td className="px-6 py-5 whitespace-nowrap">
+                              <div>
+                                <div className="text-sm font-semibold text-gray-900 mb-1">
+                                  {class_item.title}
+                                </div>
+                                <div className="text-sm text-gray-500 max-w-xs truncate">
+                                  {class_item.description}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-5 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="h-10 w-10 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-lg flex items-center justify-center mr-3">
+                                  <Users className="h-5 w-5 text-indigo-600" />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900">{class_item.batch.name}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {class_item.batch.student_count} students
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-5 whitespace-nowrap">
+                              <div className="text-sm text-gray-900 font-medium">
+                                {formatDateTime(class_item.scheduled_at)}
+                              </div>
+                            </td>
+                            <td className="px-6 py-5 whitespace-nowrap">
+                              <div className="text-sm text-gray-900 font-medium">
+                                {formatDuration(class_item.duration_minutes)}
+                              </div>
+                            </td>
+                            <td className="px-6 py-5 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusInfo(class_item.status).color}`}>
+                                <StatusIcon className="h-3 w-3 mr-1.5" />
+                                {getStatusInfo(class_item.status).text}
+                              </span>
+                            </td>
+                            <td className="px-6 py-5 whitespace-nowrap text-right text-sm font-medium">
+                              <div className="flex items-center justify-end space-x-2">
+                                {canStart(class_item) && class_item.zoom_link && (
+                                  <button
+                                    onClick={() => handleJoinClass(class_item.zoom_link!)}
+                                    className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-3 py-1.5 rounded-lg text-xs flex items-center font-medium shadow-sm hover:shadow-md transition-all duration-200"
+                                  >
+                                    <Play className="h-3 w-3 mr-1" />
+                                    Start
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleNavigation(`/teacher/classes/${class_item.id}`)}
+                                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleNavigation(`/teacher/classes/${class_item.id}/edit`)}
+                                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </button>
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setShowDropdown(showDropdown === class_item.id ? null : class_item.id)}
+                                    className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </button>
+                                  {showDropdown === class_item.id && (
+                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg z-20 border border-gray-200/50 backdrop-blur-sm">
+                                      <div className="py-2">
+                                        {class_item.zoom_link && (
+                                          <button
+                                            onClick={() => handleJoinClass(class_item.zoom_link!)}
+                                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 w-full text-left transition-colors"
+                                          >
+                                            Join Class
+                                          </button>
+                                        )}
+                                        <button
+                                          onClick={() => handleNavigation(`/teacher/attendance/${class_item.id}`)}
+                                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 w-full text-left transition-colors"
+                                        >
+                                          Mark Attendance
+                                        </button>
+                                        <button
+                                          onClick={() => handleDelete(class_item.id)}
+                                          className="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left transition-colors"
+                                        >
+                                          <Trash2 className="h-4 w-4 inline mr-2" />
+                                          Delete
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {filteredClasses.length === 0 && (
+                  <div className="text-center py-16 px-6">
+                    <div className="h-24 w-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                      <Video className="h-12 w-12 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No classes found</h3>
+                    <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
+                      {searchTerm || statusFilter 
+                        ? 'Try adjusting your search criteria or filter settings to find what you\'re looking for.' 
+                        : 'Get started by creating your first class and begin engaging with your students.'}
+                    </p>
+                    {!searchTerm && !statusFilter && (
+                      <button
+                        onClick={() => handleNavigation('/teacher/classes/create')}
+                        className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-6 py-3 rounded-xl flex items-center mx-auto shadow-lg hover:shadow-xl transition-all duration-200 font-medium"
+                      >
+                        <Plus className="h-5 w-5 mr-2" />
+                        Create Your First Class
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Pagination */}
+              {classes.links && classes.links.length > 3 && (
+                <div className="mt-8 flex justify-center">
+                  <nav className="relative z-0 inline-flex rounded-xl shadow-sm border border-gray-200/50 overflow-hidden backdrop-blur-sm">
+                    {classes.links.map((link: any, index: number) => (
+                      <button
+                        key={index}
+                        onClick={() => link.url && handleNavigation(link.url)}
+                        disabled={!link.url}
+                        className={`relative inline-flex items-center px-4 py-3 border-r border-gray-200/50 text-sm font-medium transition-all duration-200 ${
+                          link.active
+                            ? 'z-10 bg-green-50 text-green-600 border-green-200'
+                            : link.url
+                            ? 'bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                            : 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                        } ${
+                          index === classes.links.length - 1 ? 'border-r-0' : ''
+                        }`}
+                        dangerouslySetInnerHTML={{ __html: link.label }}
+                      />
+                    ))}
+                  </nav>
+                </div>
+              )}
             </div>
-          </main>
-        </div>
+          </div>
+        </main>
       </div>
     </div>
   );

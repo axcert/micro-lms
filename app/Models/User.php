@@ -9,13 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-// REMOVED: use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Facades\Log;
 use Exception;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
-    // REMOVED HasApiTokens from the use statement
     use HasFactory, Notifiable;
 
     /**
@@ -31,6 +29,14 @@ class User extends Authenticatable implements MustVerifyEmail
         'role',
         'email_verified_at',
         'is_active',
+        // Student-specific fields
+        'batch_id',
+        'class_id', 
+        'bank_slip_path',
+        'is_approved',
+        // Staff-specific fields
+        'specialization', // For teachers
+        'department',     // For admins
     ];
 
     /**
@@ -53,6 +59,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'password' => 'hashed',
         'role' => UserRole::class,
         'is_active' => 'boolean',
+        'is_approved' => 'boolean',
     ];
 
     /**
@@ -132,6 +139,30 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Check if user is approved
+     */
+    public function isApproved(): bool
+    {
+        return $this->is_approved ?? false;
+    }
+
+    /**
+     * Approve user
+     */
+    public function approve(): bool
+    {
+        return $this->update(['is_approved' => true, 'is_active' => true]);
+    }
+
+    /**
+     * Reject user approval
+     */
+    public function reject(): bool
+    {
+        return $this->update(['is_approved' => false, 'is_active' => false]);
+    }
+
+    /**
      * Activate user
      */
     public function activate(): bool
@@ -161,6 +192,22 @@ class User extends Authenticatable implements MustVerifyEmail
     public function scopeInactive($query)
     {
         return $query->where('is_active', false);
+    }
+
+    /**
+     * Scope for approved users
+     */
+    public function scopeApproved($query)
+    {
+        return $query->where('is_approved', true);
+    }
+
+    /**
+     * Scope for pending approval users
+     */
+    public function scopePendingApproval($query)
+    {
+        return $query->where('is_approved', false);
     }
 
     /**
@@ -214,6 +261,14 @@ class User extends Authenticatable implements MustVerifyEmail
     public function batches(): BelongsToMany
     {
         return $this->belongsToMany(Batch::class, 'batch_students', 'student_id', 'batch_id');
+    }
+
+    /**
+     * The specific batch this student is enrolled in
+     */
+    public function batch()
+    {
+        return $this->belongsTo(Batch::class, 'batch_id');
     }
 
     /**
@@ -305,6 +360,15 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Check if user needs approval
+     */
+    public function needsApproval(): bool
+    {
+        // Students need approval, staff auto-approved
+        return $this->isStudent() && !$this->isApproved();
+    }
+
+    /**
      * Get user's full name
      */
     public function getFullNameAttribute(): string
@@ -327,5 +391,59 @@ class User extends Authenticatable implements MustVerifyEmail
         }
         
         return substr($initials, 0, 2); // Max 2 initials
+    }
+
+    /**
+     * Get bank slip URL
+     */
+    public function getBankSlipUrlAttribute(): ?string
+    {
+        if (!$this->bank_slip_path) {
+            return null;
+        }
+
+        return asset('storage/' . $this->bank_slip_path);
+    }
+
+    /**
+     * Get status for display
+     */
+    public function getStatusAttribute(): string
+    {
+        if (!$this->is_active) {
+            return 'inactive';
+        }
+
+        if ($this->isStudent() && !$this->is_approved) {
+            return 'pending_approval';
+        }
+
+        return 'active';
+    }
+
+    /**
+     * Get status color for UI
+     */
+    public function getStatusColorAttribute(): string
+    {
+        return match($this->status) {
+            'active' => 'green',
+            'pending_approval' => 'yellow',
+            'inactive' => 'red',
+            default => 'gray'
+        };
+    }
+
+    /**
+     * Get status display name
+     */
+    public function getStatusDisplayAttribute(): string
+    {
+        return match($this->status) {
+            'active' => 'Active',
+            'pending_approval' => 'Pending Approval',
+            'inactive' => 'Inactive',
+            default => 'Unknown'
+        };
     }
 }

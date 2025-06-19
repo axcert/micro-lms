@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Head, useForm, router } from '@inertiajs/react';
-import { ArrowLeft, Users, Calendar, FileText, Trash2, Save, X } from 'lucide-react';
+import { ArrowLeft, Users, Calendar, FileText, Trash2, Save, X, AlertTriangle, CheckCircle2, Edit3 } from 'lucide-react';
 
 interface Student {
   id: number;
@@ -117,23 +117,37 @@ export default function EditBatch({
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-light">
       <Head title={`Edit Batch - ${batch.name}`} />
       
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+      {/* Minimalist Header */}
+      <div className="bg-white border-b-4 border-green-500">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
             <div className="flex items-center space-x-4">
               <button 
                 onClick={() => router.visit('/teacher/batches')}
-                className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-light transition-all duration-200"
               >
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back to Batches
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
               </button>
-              <div className="h-6 border-l border-gray-300"></div>
-              <h1 className="text-xl font-semibold text-gray-900">Edit Batch</h1>
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-green-500 rounded-lg">
+                  <Edit3 className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-black">Edit Batch</h1>
+                  <p className="text-gray-500 text-sm">{batch.name}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2 bg-green-light rounded-lg px-4 py-2">
+              <div className={`w-3 h-3 rounded-full ${data.is_active ? 'bg-green-600' : 'bg-gray-500'}`}></div>
+              <span className="text-sm font-medium text-gray-800">
+                {data.is_active ? 'Active' : 'Inactive'}
+              </span>
             </div>
           </div>
         </div>
@@ -141,46 +155,43 @@ export default function EditBatch({
 
       {/* Flash Messages */}
       {flash && (
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-          <div className={`rounded-md p-4 ${
-            flash.type === 'success' ? 'bg-green-50' : 'bg-red-50'
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <div className={`border-l-4 rounded-lg p-4 ${
+            flash.type === 'success' 
+              ? 'bg-green-light border-green-500 text-green-600' 
+              : 'bg-red-50 border-red-400 text-red-700'
           }`}>
-            <div className="flex">
-              <div className="ml-3">
-                <p className={`text-sm font-medium ${
-                  flash.type === 'success' ? 'text-green-800' : 'text-red-800'
-                }`}>
-                  {flash.message}
-                </p>
-              </div>
+            <div className="flex items-center">
+              {flash.type === 'success' ? (
+                <CheckCircle2 className="h-5 w-5 mr-3" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 mr-3" />
+              )}
+              <p className="font-medium">{flash.message}</p>
             </div>
           </div>
         </div>
       )}
 
-      <div className="py-6">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Edit Batch</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Update batch information and manage student assignments
-            </p>
-          </div>
-
-          {/* ✅ FIXED: Proper form with onSubmit handler */}
-          <form onSubmit={handleSubmit} className="bg-white shadow-sm ring-1 ring-gray-900/5 rounded-lg">
-            <div className="space-y-6 p-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* ✅ FIXED: Proper form with onSubmit handler */}
+        <form onSubmit={handleSubmit} className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left Column - Basic Info */}
+            <div className="lg:col-span-2 space-y-6">
               {/* Basic Information */}
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                  <FileText className="h-5 w-5 mr-2 text-purple-600" />
-                  Basic Information
-                </h3>
+              <div className="bg-white rounded-2xl border border-gray-300 overflow-hidden">
+                <div className="border-b border-gray-200 px-6 py-4">
+                  <div className="flex items-center space-x-3">
+                    <FileText className="h-5 w-5 text-green-500" />
+                    <h3 className="text-lg font-semibold text-gray-800">Basic Information</h3>
+                  </div>
+                </div>
                 
-                <div className="grid grid-cols-1 gap-6">
+                <div className="p-6 space-y-6">
                   {/* Batch Name */}
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="name" className="block text-sm font-semibold text-gray-800 mb-2">
                       Batch Name *
                     </label>
                     <input
@@ -188,148 +199,174 @@ export default function EditBatch({
                       id="name"
                       value={data.name}
                       onChange={(e) => setData('name', e.target.value)}
-                      className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                        errors.name ? 'border-red-300' : 'border-gray-300'
+                      className={`w-full px-4 py-3 text-gray-800 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200 ${
+                        errors.name ? 'border-red-400 bg-red-50' : 'border-gray-300 focus:border-green-500'
                       }`}
-                      placeholder="e.g., Mathematics Grade 10 - Morning"
+                      placeholder="Enter batch name"
                       required
                     />
                     {errors.name && (
-                      <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+                      <p className="mt-2 text-sm text-red-600 flex items-center">
+                        <AlertTriangle className="h-4 w-4 mr-1" />
+                        {errors.name}
+                      </p>
                     )}
                   </div>
 
                   {/* Description */}
                   <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="description" className="block text-sm font-semibold text-gray-800 mb-2">
                       Description
                     </label>
                     <textarea
                       id="description"
-                      rows={3}
+                      rows={4}
                       value={data.description}
                       onChange={(e) => setData('description', e.target.value)}
-                      className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                        errors.description ? 'border-red-300' : 'border-gray-300'
+                      className={`w-full px-4 py-3 text-gray-800 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200 resize-none ${
+                        errors.description ? 'border-red-400 bg-red-50' : 'border-gray-300 focus:border-green-500'
                       }`}
-                      placeholder="Brief description of this batch..."
+                      placeholder="Describe this batch..."
                     />
                     {errors.description && (
-                      <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+                      <p className="mt-2 text-sm text-red-600 flex items-center">
+                        <AlertTriangle className="h-4 w-4 mr-1" />
+                        {errors.description}
+                      </p>
                     )}
                   </div>
 
                   {/* Status Toggle */}
-                  <div>
-                    <label className="flex items-center">
+                  <div className="flex items-center justify-between p-4 bg-gray-light rounded-xl">
+                    <div>
+                      <h4 className="font-semibold text-gray-800">Batch Status</h4>
+                      <p className="text-sm text-gray-500">Control batch visibility</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
                       <input
                         type="checkbox"
                         checked={data.is_active}
                         onChange={(e) => setData('is_active', e.target.checked)}
-                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                        className="sr-only peer"
                       />
-                      <span className="ml-2 text-sm text-gray-700">
-                        Batch is active
-                      </span>
+                      <div className="relative w-14 h-7 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-green-500"></div>
                     </label>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Inactive batches won't appear in class/quiz assignments
-                    </p>
                   </div>
                 </div>
               </div>
 
               {/* Schedule Information */}
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                  <Calendar className="h-5 w-5 mr-2 text-purple-600" />
-                  Schedule Information
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Start Date */}
-                  <div>
-                    <label htmlFor="start_date" className="block text-sm font-medium text-gray-700">
-                      Start Date *
-                    </label>
-                    <input
-                      type="date"
-                      id="start_date"
-                      value={data.start_date}
-                      onChange={(e) => setData('start_date', e.target.value)}
-                      className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                        errors.start_date ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                      required
-                    />
-                    {errors.start_date && (
-                      <p className="mt-1 text-sm text-red-600">{errors.start_date}</p>
-                    )}
+              <div className="bg-white rounded-2xl border border-gray-300 overflow-hidden">
+                <div className="border-b border-gray-200 px-6 py-4">
+                  <div className="flex items-center space-x-3">
+                    <Calendar className="h-5 w-5 text-green-500" />
+                    <h3 className="text-lg font-semibold text-gray-800">Schedule</h3>
                   </div>
+                </div>
+                
+                <div className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Start Date */}
+                    <div>
+                      <label htmlFor="start_date" className="block text-sm font-semibold text-gray-800 mb-2">
+                        Start Date *
+                      </label>
+                      <input
+                        type="date"
+                        id="start_date"
+                        value={data.start_date}
+                        onChange={(e) => setData('start_date', e.target.value)}
+                        className={`w-full px-4 py-3 text-gray-800 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200 ${
+                          errors.start_date ? 'border-red-400 bg-red-50' : 'border-gray-300 focus:border-green-500'
+                        }`}
+                        required
+                      />
+                      {errors.start_date && (
+                        <p className="mt-2 text-sm text-red-600 flex items-center">
+                          <AlertTriangle className="h-4 w-4 mr-1" />
+                          {errors.start_date}
+                        </p>
+                      )}
+                    </div>
 
-                  {/* End Date */}
-                  <div>
-                    <label htmlFor="end_date" className="block text-sm font-medium text-gray-700">
-                      End Date (Optional)
-                    </label>
-                    <input
-                      type="date"
-                      id="end_date"
-                      value={data.end_date}
-                      onChange={(e) => setData('end_date', e.target.value)}
-                      min={data.start_date}
-                      className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                        errors.end_date ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                    />
-                    {errors.end_date && (
-                      <p className="mt-1 text-sm text-red-600">{errors.end_date}</p>
-                    )}
+                    {/* End Date */}
+                    <div>
+                      <label htmlFor="end_date" className="block text-sm font-semibold text-gray-800 mb-2">
+                        End Date (Optional)
+                      </label>
+                      <input
+                        type="date"
+                        id="end_date"
+                        value={data.end_date}
+                        onChange={(e) => setData('end_date', e.target.value)}
+                        min={data.start_date}
+                        className={`w-full px-4 py-3 text-gray-800 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200 ${
+                          errors.end_date ? 'border-red-400 bg-red-50' : 'border-gray-300 focus:border-green-500'
+                        }`}
+                      />
+                      {errors.end_date && (
+                        <p className="mt-2 text-sm text-red-600 flex items-center">
+                          <AlertTriangle className="h-4 w-4 mr-1" />
+                          {errors.end_date}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Max Students */}
-                  <div className="md:col-span-2">
-                    <label htmlFor="max_students" className="block text-sm font-medium text-gray-700">
-                      Maximum Students (Optional)
+                  <div>
+                    <label htmlFor="max_students" className="block text-sm font-semibold text-gray-800 mb-2">
+                      Maximum Students
                     </label>
-                    <input
-                      type="number"
-                      id="max_students"
-                      value={data.max_students}
-                      onChange={(e) => setData('max_students', e.target.value ? parseInt(e.target.value) : '')}
-                      min="1"
-                      max="100"
-                      className={`mt-1 block w-full md:w-48 border rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm ${
-                        errors.max_students ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                      placeholder="e.g., 30"
-                    />
-                    <p className="mt-1 text-sm text-gray-500">
-                      Currently {selectedStudents.length} students assigned
-                    </p>
+                    <div className="flex items-center space-x-4">
+                      <input
+                        type="number"
+                        id="max_students"
+                        value={data.max_students}
+                        onChange={(e) => setData('max_students', e.target.value ? parseInt(e.target.value) : '')}
+                        min="1"
+                        max="100"
+                        className={`w-32 px-4 py-3 text-gray-800 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200 ${
+                          errors.max_students ? 'border-red-400 bg-red-50' : 'border-gray-300 focus:border-green-500'
+                        }`}
+                        placeholder="30"
+                      />
+                      <div className="flex-1 px-4 py-3 bg-green-light text-green-600 rounded-xl text-sm font-medium">
+                        {selectedStudents.length} students currently selected
+                      </div>
+                    </div>
                     {errors.max_students && (
-                      <p className="mt-1 text-sm text-red-600">{errors.max_students}</p>
+                      <p className="mt-2 text-sm text-red-600 flex items-center">
+                        <AlertTriangle className="h-4 w-4 mr-1" />
+                        {errors.max_students}
+                      </p>
                     )}
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Student Management */}
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                  <Users className="h-5 w-5 mr-2 text-purple-600" />
-                  Manage Students
-                </h3>
+            {/* Right Column - Student Management */}
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl border border-gray-300 overflow-hidden h-fit">
+                <div className="border-b border-gray-200 px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Users className="h-5 w-5 text-green-500" />
+                      <h3 className="text-lg font-semibold text-gray-800">Students</h3>
+                    </div>
+                    <span className="px-3 py-1 bg-green-light text-green-600 text-sm font-medium rounded-full">
+                      {selectedStudents.length} selected
+                    </span>
+                  </div>
+                </div>
                 
-                <div>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Select students to assign to this batch. Currently enrolled students will remain selected.
-                  </p>
-                  
-                  <div className="border border-gray-200 rounded-md max-h-60 overflow-y-auto">
+                <div className="p-6">
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
                     {allStudents.length === 0 ? (
-                      <div className="p-4 text-center text-gray-500">
-                        No students available
+                      <div className="text-center py-8 text-gray-500">
+                        <Users className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                        <p className="text-sm">No students available</p>
                       </div>
                     ) : (
                       allStudents.map((student) => {
@@ -339,103 +376,107 @@ export default function EditBatch({
                         return (
                           <div
                             key={student.id}
-                            className={`flex items-center justify-between p-3 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 cursor-pointer ${
-                              isSelected ? 'bg-purple-50' : ''
+                            className={`p-3 border rounded-xl cursor-pointer transition-all duration-200 hover:border-green-500 ${
+                              isSelected ? 'border-green-500 bg-green-light' : 'border-gray-200'
                             }`}
                             onClick={() => toggleStudent(student.id)}
                           >
-                            <div className="flex items-center">
+                            <div className="flex items-start space-x-3">
                               <input
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={() => toggleStudent(student.id)}
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                                className="mt-1 h-4 w-4 text-green-500 focus:ring-green-500 border-gray-300 rounded"
                               />
-                              <div className="ml-3">
-                                <p className="text-sm font-medium text-gray-900 flex items-center">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-800 truncate">
                                   {student.name}
-                                  {isCurrentlyEnrolled && (
-                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                      Currently Enrolled
-                                    </span>
-                                  )}
                                 </p>
-                                <p className="text-sm text-gray-500">
+                                <p className="text-xs text-gray-500 truncate">
                                   {student.email}
                                 </p>
+                                <div className="flex items-center space-x-2 mt-1">
+                                  {isCurrentlyEnrolled && (
+                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-md">
+                                      Enrolled
+                                    </span>
+                                  )}
+                                  {isCurrentlyEnrolled && !isSelected && (
+                                    <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-md">
+                                      Removing
+                                    </span>
+                                  )}
+                                  {!isCurrentlyEnrolled && isSelected && (
+                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-md">
+                                      Adding
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                            
-                            {isCurrentlyEnrolled && !isSelected && (
-                              <span className="text-xs text-red-600 font-medium">
-                                Will be removed
-                              </span>
-                            )}
-                            {!isCurrentlyEnrolled && isSelected && (
-                              <span className="text-xs text-green-600 font-medium">
-                                Will be added
-                              </span>
-                            )}
                           </div>
                         );
                       })
                     )}
                   </div>
                   
-                  <div className="mt-2 flex items-center justify-between text-sm text-gray-600">
-                    <span>
-                      {selectedStudents.length} student{selectedStudents.length !== 1 ? 's' : ''} selected
-                    </span>
-                    {data.max_students && selectedStudents.length > data.max_students && (
-                      <span className="text-red-600 font-medium">
-                        Exceeds maximum limit ({data.max_students})
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                {errors.student_ids && (
-                  <p className="mt-1 text-sm text-red-600">{errors.student_ids}</p>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="border-t border-gray-200 pt-6">
-                <div className="flex justify-between">
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    className="inline-flex items-center px-4 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Batch
-                  </button>
+                  {data.max_students && selectedStudents.length > data.max_students && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+                      <div className="flex items-center">
+                        <AlertTriangle className="h-4 w-4 text-red-600 mr-2" />
+                        <p className="text-sm text-red-700 font-medium">
+                          Exceeds limit by {selectedStudents.length - data.max_students}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   
-                  <div className="flex space-x-3">
-                    <button
-                      type="button"
-                      onClick={handleCancel}
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={processing}
-                      className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 ${
-                        processing ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      {processing ? 'Saving...' : 'Save Changes'}
-                    </button>
-                  </div>
+                  {errors.student_ids && (
+                    <p className="mt-4 text-sm text-red-600 flex items-center">
+                      <AlertTriangle className="h-4 w-4 mr-1" />
+                      {errors.student_ids}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
-          </form>
-        </div>
+          </div>
+
+          {/* Actions */}
+          <div className="bg-white rounded-2xl border border-gray-300 p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="sm:order-1 inline-flex items-center justify-center px-6 py-3 border border-red-400 text-red-600 font-medium rounded-xl hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all duration-200"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Batch
+              </button>
+              
+              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-light focus:outline-none focus:ring-2 focus:ring-gray-500 transition-all duration-200"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={processing}
+                  className={`inline-flex items-center justify-center px-8 py-3 bg-green-500 text-white font-medium rounded-xl hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200 ${
+                    processing ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {processing ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   );

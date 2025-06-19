@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Teacher\TeacherDashboardController;
 use App\Http\Controllers\Teacher\BatchController;
+use App\Http\Controllers\Teacher\ClassController; 
 use App\Http\Controllers\Student\StudentDashboardController;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Foundation\Application;
@@ -26,7 +27,6 @@ Route::get('/', function () {
         'canRegister' => Route::has('register'),
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
-        // ADD THIS: Pass authentication data to the frontend
         'auth' => [
             'user' => auth()->check() ? [
                 'id' => auth()->user()->id,
@@ -44,9 +44,13 @@ Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
 
-    // Register routes
+    // Student Registration routes
     Route::get('register', [RegisteredUserController::class, 'create'])->name('register');
     Route::post('register', [RegisteredUserController::class, 'store']);
+
+    // Staff (Teacher/Admin) Registration routes
+    Route::get('register/staff', [RegisteredUserController::class, 'createStaff'])->name('register.staff');
+    Route::post('register/staff', [RegisteredUserController::class, 'storeStaff'])->name('register.staff.store');
 
     // Password reset routes
     Route::get('forgot-password', [PasswordResetController::class, 'create'])->name('password.request');
@@ -63,21 +67,31 @@ Route::middleware('auth')->group(function () {
     // Generic dashboard (fallback)
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Admin routes - Using full class name instead of 'role:admin'
+    // Student Approval routes (accessible by admin and teachers)
+    Route::middleware([RoleMiddleware::class . ':admin,teacher'])->group(function () {
+        Route::get('/pending-approvals', [RegisteredUserController::class, 'getPendingApprovals'])->name('pending.approvals');
+        Route::post('/approve-student/{student}', [RegisteredUserController::class, 'approveStudent'])->name('approve.student');
+        Route::post('/reject-student/{student}', [RegisteredUserController::class, 'rejectStudent'])->name('reject.student');
+    });
+
+    // Admin routes
     Route::middleware([RoleMiddleware::class . ':admin'])->prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
         Route::get('/teachers', [AdminDashboardController::class, 'teachers'])->name('teachers.index');
         Route::get('/students', [AdminDashboardController::class, 'students'])->name('students.index');
         Route::get('/reports', [AdminDashboardController::class, 'reports'])->name('reports');
         Route::get('/settings', [AdminDashboardController::class, 'settings'])->name('settings');
+        
+        // Admin-specific approval management
+        Route::get('/pending-students', [AdminDashboardController::class, 'pendingStudents'])->name('pending.students');
     });
 
-    // Teacher routes - Using full class name instead of 'role:teacher'
+    // Teacher routes
     Route::middleware([RoleMiddleware::class . ':teacher'])->prefix('teacher')->name('teacher.')->group(function () {
         // Dashboard
         Route::get('/dashboard', [TeacherDashboardController::class, 'index'])->name('dashboard');
         
-        // Batch Management - Full CRUD Resource Routes (including destroy)
+        // Batch Management - Full CRUD Resource Routes
         Route::resource('batches', BatchController::class);
         
         // Batch Student Management
@@ -90,13 +104,32 @@ Route::middleware('auth')->group(function () {
         Route::post('batches/{batch}/duplicate', [BatchController::class, 'duplicate'])->name('batches.duplicate');
         Route::get('batches/{batch}/export', [BatchController::class, 'export'])->name('batches.export');
         
-        // Other existing routes
-        Route::get('/classes', [TeacherDashboardController::class, 'classes'])->name('classes.index');
+        // Class Management Routes - NEW
+        Route::prefix('classes')->name('classes.')->group(function () {
+            Route::get('/', [ClassController::class, 'index'])->name('index');
+            Route::get('/create', [ClassController::class, 'create'])->name('create');
+            Route::post('/', [ClassController::class, 'store'])->name('store');
+            Route::get('/{id}', [ClassController::class, 'show'])->name('show');
+            Route::get('/{id}/edit', [ClassController::class, 'edit'])->name('edit');
+            Route::put('/{id}', [ClassController::class, 'update'])->name('update');
+            Route::delete('/{id}', [ClassController::class, 'destroy'])->name('destroy');
+            
+            // Class Actions
+            Route::post('/{id}/start', [ClassController::class, 'start'])->name('start');
+            Route::post('/{id}/complete', [ClassController::class, 'complete'])->name('complete');
+            Route::post('/{id}/cancel', [ClassController::class, 'cancel'])->name('cancel');
+        });
+        
+        // Existing routes updated to use ClassController
+        Route::get('/classes-old', [TeacherDashboardController::class, 'classes'])->name('classes-old.index');
         Route::get('/quizzes', [TeacherDashboardController::class, 'quizzes'])->name('quizzes.index');
         Route::get('/reports', [TeacherDashboardController::class, 'reports'])->name('reports');
+        
+        // Teacher-specific approval management (for their batches)
+        Route::get('/pending-students', [TeacherDashboardController::class, 'pendingStudents'])->name('pending.students');
     });
 
-    // Student routes - Using full class name instead of 'role:student'
+    // Student routes (only for approved students)
     Route::middleware([RoleMiddleware::class . ':student'])->prefix('student')->name('student.')->group(function () {
         Route::get('/dashboard', [StudentDashboardController::class, 'index'])->name('dashboard');
         Route::get('/classes', [StudentDashboardController::class, 'classes'])->name('classes.index');
@@ -107,9 +140,29 @@ Route::middleware('auth')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
+| API Routes for AJAX calls - NEW
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth', RoleMiddleware::class . ':teacher'])->prefix('api/teacher')->name('api.teacher.')->group(function () {
+    
+    // Get batch students
+    Route::get('/batches/{id}/students', [BatchController::class, 'getStudents'])->name('batch.students');
+    
+    // Check class scheduling conflicts
+    Route::post('/classes/check-conflicts', [ClassController::class, 'checkConflicts'])->name('classes.check-conflicts');
+    
+    // Get class statistics
+    Route::get('/classes/{id}/stats', [ClassController::class, 'getStats'])->name('classes.stats');
+    
+    // Get dashboard data
+    Route::get('/dashboard/data', [TeacherDashboardController::class, 'getDashboardData'])->name('dashboard.data');
+});
+
+/*
+|--------------------------------------------------------------------------
 | Error Testing Routes (REMOVE IN PRODUCTION)
 |--------------------------------------------------------------------------
-| These routes are for testing error pages during development
 */
 if (app()->environment(['local', 'development'])) {
     Route::prefix('test-errors')->name('test.errors.')->group(function () {
@@ -149,7 +202,42 @@ if (app()->environment(['local', 'development'])) {
 |--------------------------------------------------------------------------
 */
 if (app()->environment(['local', 'development'])) {
-    // Add these temporary debug routes to the bottom of your web.php
+    // Registration testing routes
+    Route::get('/debug-registrations', function () {
+        return response()->json([
+            'total_users' => \App\Models\User::count(),
+            'students' => [
+                'total' => \App\Models\User::students()->count(),
+                'approved' => \App\Models\User::students()->approved()->count(),
+                'pending' => \App\Models\User::students()->pendingApproval()->count(),
+            ],
+            'teachers' => \App\Models\User::teachers()->count(),
+            'admins' => \App\Models\User::admins()->count(),
+            'pending_students' => \App\Models\User::students()
+                ->pendingApproval()
+                ->with('batch:id,name')
+                ->get()
+                ->map(function($user) {
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'batch' => $user->batch->name ?? 'No batch',
+                        'bank_slip' => $user->bank_slip_path ? 'Yes' : 'No',
+                        'registered_at' => $user->created_at->format('Y-m-d H:i:s'),
+                    ];
+                }),
+        ], 200, [], JSON_PRETTY_PRINT);
+    });
+
+    // Simulate approval
+    Route::get('/debug-approve/{userId}', function ($userId) {
+        $user = \App\Models\User::findOrFail($userId);
+        $user->approve();
+        return response()->json(['message' => "User {$user->name} approved successfully"]);
+    });
+
+    // Add these temporary debug routes
     Route::get('/debug-auth', function () {
         return response()->json([
             'authenticated' => auth()->check(),
@@ -171,198 +259,14 @@ if (app()->environment(['local', 'development'])) {
         session()->regenerate();
         return redirect('/')->with('message', 'Sessions cleared');
     });
-
-    // Debug route for teacher dashboard data
-    Route::get('/debug-teacher-dashboard', function() {
-        // Simulate what the dashboard controller does
-        $teacher = \App\Models\User::where('email', 'teacher@mlms.com')->first();
-        
-        if (!$teacher) {
-            return response()->json(['error' => 'Teacher not found']);
-        }
-        
-        try {
-            // Get teacher's batches with student count
-            $myBatches = \App\Models\Batch::where('teacher_id', $teacher->id)
-                ->withCount('students')
-                ->latest()
-                ->take(5)
-                ->get()
-                ->map(function ($batch) {
-                    return [
-                        'id' => $batch->id,
-                        'name' => $batch->name,
-                        'description' => $batch->description ?? '',
-                        'students_count' => $batch->students_count ?? 0,
-                    ];
-                });
-
-            // Get upcoming classes for teacher's batches
-            $upcomingClasses = \App\Models\Lesson::whereHas('batch', function ($query) use ($teacher) {
-                    $query->where('teacher_id', $teacher->id);
-                })
-                ->where('scheduled_at', '>=', now())
-                ->with(['batch:id,name'])
-                ->orderBy('scheduled_at')
-                ->take(5)
-                ->get()
-                ->map(function ($class) {
-                    return [
-                        'id' => $class->id,
-                        'title' => $class->title ?? 'Untitled Class',
-                        'scheduled_at' => $class->scheduled_at->toISOString(),
-                        'zoom_link' => $class->zoom_link ?? '',
-                        'batch' => [
-                            'id' => $class->batch->id,
-                            'name' => $class->batch->name,
-                        ],
-                    ];
-                });
-
-            // Get recent quizzes for teacher's batches
-            $recentQuizzes = \App\Models\Quiz::whereHas('batch', function ($query) use ($teacher) {
-                    $query->where('teacher_id', $teacher->id);
-                })
-                ->with(['batch:id,name'])
-                ->latest()
-                ->take(5)
-                ->get()
-                ->map(function ($quiz) {
-                    return [
-                        'id' => $quiz->id,
-                        'title' => $quiz->title ?? 'Untitled Quiz',
-                        'status' => $quiz->status ?? 'draft',
-                        'total_marks' => $quiz->total_marks ?? 0,
-                        'batch' => [
-                            'id' => $quiz->batch->id,
-                            'name' => $quiz->batch->name,
-                        ],
-                    ];
-                });
-
-            // Calculate stats
-            $totalBatches = \App\Models\Batch::where('teacher_id', $teacher->id)->count();
-            $batchesWithStudents = \App\Models\Batch::where('teacher_id', $teacher->id)->withCount('students')->get();
-            $totalStudents = $batchesWithStudents->sum('students_count');
-            
-            $activeQuizzes = \App\Models\Quiz::whereHas('batch', function ($query) use ($teacher) {
-                $query->where('teacher_id', $teacher->id);
-            })->where('status', 'active')->count();
-            
-            $upcomingClassesCount = \App\Models\Lesson::whereHas('batch', function ($query) use ($teacher) {
-                $query->where('teacher_id', $teacher->id);
-            })->where('scheduled_at', '>=', now())->count();
-
-            $stats = [
-                'total_batches' => $totalBatches,
-                'total_students' => $totalStudents,
-                'active_quizzes' => $activeQuizzes,
-                'upcoming_classes' => $upcomingClassesCount,
-            ];
-
-            return response()->json([
-                'success' => true,
-                'teacher' => [
-                    'id' => $teacher->id,
-                    'name' => $teacher->name,
-                    'email' => $teacher->email,
-                ],
-                'dashboard_data' => [
-                    'myBatches' => $myBatches,
-                    'upcomingClasses' => $upcomingClasses,
-                    'recentQuizzes' => $recentQuizzes,
-                    'stats' => $stats,
-                ],
-                'summary' => [
-                    'batches_count' => count($myBatches),
-                    'classes_count' => count($upcomingClasses),
-                    'quizzes_count' => count($recentQuizzes),
-                    'should_dashboard_work' => count($myBatches) > 0 || count($upcomingClasses) > 0
-                ],
-                'raw_counts' => [
-                    'total_batches' => \App\Models\Batch::count(),
-                    'teacher_batches' => \App\Models\Batch::where('teacher_id', $teacher->id)->count(),
-                    'total_lessons' => \App\Models\Lesson::count(),
-                    'teacher_lessons' => \App\Models\Lesson::whereHas('batch', function($q) use ($teacher) {
-                        $q->where('teacher_id', $teacher->id);
-                    })->count(),
-                    'total_quizzes' => \App\Models\Quiz::count(),
-                    'teacher_quizzes' => \App\Models\Quiz::whereHas('batch', function($q) use ($teacher) {
-                        $q->where('teacher_id', $teacher->id);
-                    })->count(),
-                ]
-            ], 200, [], JSON_PRETTY_PRINT);
-            
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Dashboard data fetch failed',
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-        }
-    });
-
-    // Quick data verification route
-    Route::get('/verify-data', function() {
-        try {
-            $teacher = \App\Models\User::where('email', 'teacher@mlms.com')->first();
-            
-            if (!$teacher) {
-                return response()->json(['error' => 'Teacher not found. Run UserSeeder first.']);
-            }
-            
-            $data = [
-                'teacher' => [
-                    'id' => $teacher->id,
-                    'name' => $teacher->name,
-                    'email' => $teacher->email,
-                ],
-                'counts' => [
-                    'total_users' => \App\Models\User::count(),
-                    'teachers' => \App\Models\User::where('role', 'teacher')->count(),
-                    'students' => \App\Models\User::where('role', 'student')->count(),
-                    'total_batches' => \App\Models\Batch::count(),
-                    'teacher_batches' => \App\Models\Batch::where('teacher_id', $teacher->id)->count(),
-                    'total_lessons' => \App\Models\Lesson::count(),
-                    'teacher_lessons' => \App\Models\Lesson::whereHas('batch', function($q) use ($teacher) {
-                        $q->where('teacher_id', $teacher->id);
-                    })->count(),
-                    'total_quizzes' => \App\Models\Quiz::count(),
-                    'teacher_quizzes' => \App\Models\Quiz::whereHas('batch', function($q) use ($teacher) {
-                        $q->where('teacher_id', $teacher->id);
-                    })->count(),
-                ],
-                'sample_data' => [
-                    'first_batch' => \App\Models\Batch::where('teacher_id', $teacher->id)->first(),
-                    'first_lesson' => \App\Models\Lesson::whereHas('batch', function($q) use ($teacher) {
-                        $q->where('teacher_id', $teacher->id);
-                    })->first(),
-                    'first_quiz' => \App\Models\Quiz::whereHas('batch', function($q) use ($teacher) {
-                        $q->where('teacher_id', $teacher->id);
-                    })->first(),
-                ]
-            ];
-            
-            return response()->json($data, 200, [], JSON_PRETTY_PRINT);
-            
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Error checking data',
-                'message' => $e->getMessage(),
-            ]);
-        }
-    });
 }
 
 /*
 |--------------------------------------------------------------------------
 | Fallback Route (404 Handler)
 |--------------------------------------------------------------------------
-| This must be the LAST route defined. It catches all undefined routes
-| and renders the 404 error page through Inertia.js
 */
 Route::fallback(function () {
-    // Check if it's an Inertia request
     if (request()->header('X-Inertia')) {
         return Inertia::render('Errors/404', [
             'status' => 404,
@@ -379,6 +283,5 @@ Route::fallback(function () {
         ]);
     }
     
-    // For non-Inertia requests, still abort with 404
     abort(404);
 });

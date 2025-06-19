@@ -13,7 +13,14 @@ import {
   TrendingUp,
   Settings,
   Save,
-  Trash2
+  Trash2,
+  CheckCircle2,
+  AlertTriangle,
+  Eye,
+  Plus,
+  MoreVertical,
+  Activity,
+  Info
 } from 'lucide-react';
 
 interface Student {
@@ -134,42 +141,64 @@ export default function BatchShow({
   };
 
   const getStatusBadge = (status: string) => {
-    const baseClasses = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium";
+    const baseClasses = "inline-flex items-center px-2 py-1 rounded-md text-xs font-medium";
     
     switch (status) {
       case 'scheduled':
-        return `${baseClasses} bg-blue-100 text-blue-800`;
+        return `${baseClasses} bg-green-100 text-green-600`;
       case 'completed':
-        return `${baseClasses} bg-green-100 text-green-800`;
+        return `${baseClasses} bg-green-100 text-green-600`;
       case 'cancelled':
-        return `${baseClasses} bg-red-100 text-red-800`;
+        return `${baseClasses} bg-gray-100 text-gray-500`;
       case 'active':
-        return `${baseClasses} bg-green-100 text-green-800`;
+        return `${baseClasses} bg-green-100 text-green-600`;
       case 'draft':
-        return `${baseClasses} bg-gray-100 text-gray-800`;
+        return `${baseClasses} bg-gray-100 text-gray-500`;
       default:
-        return `${baseClasses} bg-gray-100 text-gray-800`;
+        return `${baseClasses} bg-gray-100 text-gray-500`;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <Head title={`${batch.name} - Batch Details`} />
       
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button 
-                onClick={handleBackToBatches}
-                className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
-              >
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back to Batches
-              </button>
-              <div className="h-6 border-l border-gray-300"></div>
-              <h1 className="text-xl font-semibold text-gray-900">Batch Details</h1>
+      {/* Clean Header */}
+      <div className="border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="py-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+              <div className="flex items-center space-x-4">
+                <button 
+                  onClick={handleBackToBatches}
+                  className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center"
+                >
+                  <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  Back to Batches
+                </button>
+                <div className="h-6 w-px bg-gray-100"></div>
+                <div>
+                  <h1 className="text-2xl lg:text-3xl font-bold text-black">{batch.name}</h1>
+                  <p className="text-gray-500 mt-1">{batch.description || 'No description provided'}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  batch.is_active 
+                    ? 'bg-green-100 text-green-600' 
+                    : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {batch.is_active ? 'Active' : 'Inactive'}
+                </div>
+                <button
+                  onClick={handleEdit}
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-800 bg-white border border-gray-100 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -178,318 +207,268 @@ export default function BatchShow({
       {/* Flash Messages */}
       {flash && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-          <div className={`rounded-md p-4 ${
-            flash.type === 'success' ? 'bg-green-50' : 'bg-red-50'
+          <div className={`border-l-4 p-4 rounded ${
+            flash.type === 'success' 
+              ? 'bg-green-100 border-green-500 text-green-600' 
+              : 'bg-gray-100 border-gray-500 text-gray-800'
           }`}>
-            <div className="flex">
-              <div className="ml-3">
-                <p className={`text-sm font-medium ${
-                  flash.type === 'success' ? 'text-green-800' : 'text-red-800'
-                }`}>
-                  {flash.message}
-                </p>
-              </div>
+            <div className="flex items-center">
+              {flash.type === 'success' ? (
+                <CheckCircle2 className="h-5 w-5 mr-2" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 mr-2" />
+              )}
+              <p className="font-medium">{flash.message}</p>
             </div>
           </div>
         </div>
       )}
 
-      <div className="py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center space-x-3">
-                  <h2 className="text-2xl font-bold text-gray-900">{batch.name}</h2>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    batch.is_active 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {batch.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-gray-500">
-                  {batch.description || 'No description provided'}
-                </p>
-              </div>
-              
-              <div className="flex space-x-3">
-                <button
-                  onClick={handleScheduleClass}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  <Video className="h-4 w-4 mr-2" />
-                  Schedule Class
-                </button>
-                <button
-                  onClick={handleCreateQuiz}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
-                >
-                  <FileQuestion className="h-4 w-4 mr-2" />
-                  Create Quiz
-                </button>
-                <button
-                  onClick={handleEdit}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Batch
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <Users className="h-8 w-8 text-purple-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Students</p>
-                  <p className="text-2xl font-semibold text-gray-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Sidebar - Stats & Actions */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Quick Stats */}
+            <div className="bg-gray-100 rounded-lg p-6 border border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Overview</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-1.5 bg-green-500 rounded">
+                      <Users className="h-4 w-4 text-white" />
+                    </div>
+                    <span className="text-sm text-gray-500">Students</span>
+                  </div>
+                  <span className="text-lg font-bold text-black">
                     {stats.students_count}
                     {batch.max_students && (
-                      <span className="text-sm text-gray-500 font-normal">
-                        /{batch.max_students}
-                      </span>
+                      <span className="text-sm text-gray-500 font-normal">/{batch.max_students}</span>
                     )}
-                  </p>
+                  </span>
                 </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <Video className="h-8 w-8 text-blue-600" />
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-1.5 bg-green-600 rounded">
+                      <Video className="h-4 w-4 text-white" />
+                    </div>
+                    <span className="text-sm text-gray-500">Classes</span>
+                  </div>
+                  <span className="text-lg font-bold text-black">{stats.classes_count}</span>
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Classes</p>
-                  <p className="text-2xl font-semibold text-gray-900">
-                    {stats.classes_count}
-                  </p>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-1.5 bg-green-400 rounded">
+                      <FileQuestion className="h-4 w-4 text-white" />
+                    </div>
+                    <span className="text-sm text-gray-500">Quizzes</span>
+                  </div>
+                  <span className="text-lg font-bold text-black">{stats.quizzes_count}</span>
                 </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <FileQuestion className="h-8 w-8 text-yellow-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Quizzes</p>
-                  <p className="text-2xl font-semibold text-gray-900">
-                    {stats.quizzes_count}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <Calendar className="h-8 w-8 text-green-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Duration</p>
-                  <p className="text-sm font-semibold text-gray-900">
+                
+                <div className="pt-2 border-t border-gray-100">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm text-gray-500">Duration</span>
+                  </div>
+                  <div className="text-sm font-medium text-gray-800">
                     {formatDate(batch.start_date)}
                     {batch.end_date && (
-                      <>
-                        <br />
-                        <span className="text-xs text-gray-500">to {formatDate(batch.end_date)}</span>
-                      </>
+                      <div className="text-xs text-gray-500 mt-1">
+                        to {formatDate(batch.end_date)}
+                      </div>
                     )}
-                  </p>
+                  </div>
                 </div>
               </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="space-y-3">
+              <button
+                onClick={handleScheduleClass}
+                className="w-full flex items-center justify-center px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
+              >
+                <Video className="h-5 w-5 mr-2" />
+                Schedule Class
+              </button>
+              
+              <button
+                onClick={handleCreateQuiz}
+                className="w-full flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-500 transition-colors font-medium"
+              >
+                <FileQuestion className="h-5 w-5 mr-2" />
+                Create Quiz
+              </button>
+              
+              <button
+                onClick={handleManageStudents}
+                className="w-full flex items-center justify-center px-4 py-3 bg-green-400 text-white rounded-lg hover:bg-green-500 transition-colors font-medium"
+              >
+                <Users className="h-5 w-5 mr-2" />
+                Manage Students
+              </button>
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
+          {/* Main Content */}
+          <div className="lg:col-span-3">
+            {/* Simple Tab Navigation */}
+            <div className="flex space-x-1 mb-6 bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setActiveTab('overview')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   activeTab === 'overview'
-                    ? 'border-purple-500 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'bg-white text-gray-800 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-800'
                 }`}
               >
-                Overview
+                <Info className="h-4 w-4" />
+                <span>Information</span>
               </button>
               <button
                 onClick={() => setActiveTab('students')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   activeTab === 'students'
-                    ? 'border-purple-500 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'bg-white text-gray-800 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-800'
                 }`}
               >
-                Students ({stats.students_count})
+                <Users className="h-4 w-4" />
+                <span>Students</span>
+                <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-xs">
+                  {stats.students_count}
+                </span>
               </button>
               <button
                 onClick={() => setActiveTab('activity')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   activeTab === 'activity'
-                    ? 'border-purple-500 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'bg-white text-gray-800 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-800'
                 }`}
               >
-                Recent Activity
+                <Activity className="h-4 w-4" />
+                <span>Activity</span>
               </button>
-            </nav>
-          </div>
+            </div>
 
-          {/* Tab Content */}
-          <div className="mt-6">
+            {/* Tab Content */}
             {activeTab === 'overview' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Batch Information */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Batch Information</h3>
-                  <dl className="space-y-4">
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Start Date</dt>
-                      <dd className="text-sm text-gray-900">{formatDate(batch.start_date)}</dd>
-                    </div>
-                    {batch.end_date && (
+              <div className="space-y-6">
+                {/* Batch Details */}
+                <div className="bg-white border border-gray-100 rounded-lg">
+                  <div className="px-6 py-4 border-b border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-800">Batch Details</h3>
+                  </div>
+                  <div className="px-6 py-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <dt className="text-sm font-medium text-gray-500">End Date</dt>
-                        <dd className="text-sm text-gray-900">{formatDate(batch.end_date)}</dd>
+                        <label className="block text-sm font-medium text-gray-500 mb-1">Start Date</label>
+                        <p className="text-gray-800 font-medium">{formatDate(batch.start_date)}</p>
                       </div>
-                    )}
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Maximum Students</dt>
-                      <dd className="text-sm text-gray-900">
-                        {batch.max_students || 'No limit'}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">Current Status</dt>
-                      <dd className="text-sm">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      {batch.end_date && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-500 mb-1">End Date</label>
+                          <p className="text-gray-800 font-medium">{formatDate(batch.end_date)}</p>
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500 mb-1">Maximum Students</label>
+                        <p className="text-gray-800 font-medium">{batch.max_students || 'No limit'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500 mb-1">Status</label>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
                           batch.is_active 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
+                            ? 'bg-green-100 text-green-600' 
+                            : 'bg-gray-100 text-gray-500'
                         }`}>
                           {batch.is_active ? 'Active' : 'Inactive'}
                         </span>
-                      </dd>
+                      </div>
                     </div>
-                  </dl>
+                  </div>
                 </div>
 
-                {/* Quick Actions */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-                  <div className="space-y-3">
-                    <button
-                      onClick={handleScheduleClass}
-                      className="flex items-center w-full p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors text-left"
-                    >
-                      <Video className="h-5 w-5 text-blue-600 mr-3" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Schedule a Class</p>
-                        <p className="text-xs text-gray-500">Create a new Zoom class for this batch</p>
+                {/* Teacher Information */}
+                <div className="bg-white border border-gray-100 rounded-lg">
+                  <div className="px-6 py-4 border-b border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-800">Teacher</h3>
+                  </div>
+                  <div className="px-6 py-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-bold text-white">
+                          {batch.teacher.name.charAt(0).toUpperCase()}
+                        </span>
                       </div>
-                    </button>
-                    
-                    <button
-                      onClick={handleCreateQuiz}
-                      className="flex items-center w-full p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors text-left"
-                    >
-                      <FileQuestion className="h-5 w-5 text-yellow-600 mr-3" />
                       <div>
-                        <p className="text-sm font-medium text-gray-900">Create a Quiz</p>
-                        <p className="text-xs text-gray-500">Add questions and assessments</p>
+                        <p className="font-medium text-gray-800">{batch.teacher.name}</p>
+                        <p className="text-sm text-gray-500">Primary Teacher</p>
                       </div>
-                    </button>
-                    
-                    <button
-                      onClick={handleEdit}
-                      className="flex items-center w-full p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors text-left"
-                    >
-                      <Settings className="h-5 w-5 text-gray-600 mr-3" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Manage Batch</p>
-                        <p className="text-xs text-gray-500">Edit details and student assignments</p>
-                      </div>
-                    </button>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
             {activeTab === 'students' && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-medium text-gray-900">
-                      Students ({stats.students_count})
-                    </h3>
-                    <button
-                      onClick={handleManageStudents}
-                      className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                    >
-                      Manage Students
-                    </button>
-                  </div>
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Students ({stats.students_count})
+                  </h3>
+                  <button
+                    onClick={handleManageStudents}
+                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-800 bg-white border border-gray-100 rounded-lg hover:bg-gray-100"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Students
+                  </button>
                 </div>
                 
                 {batch.students.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Users className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">No students assigned</h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Add students to this batch to get started.
-                    </p>
-                    <div className="mt-6">
-                      <button
-                        onClick={handleManageStudents}
-                        className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                      >
-                        Add Students
-                      </button>
-                    </div>
+                  <div className="text-center py-12 bg-gray-100 rounded-lg border-2 border-dashed border-gray-100">
+                    <Users className="mx-auto h-12 w-12 text-gray-500 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-800 mb-2">No students enrolled</h3>
+                    <p className="text-gray-500 mb-6">Get started by adding students to this batch.</p>
+                    <button
+                      onClick={handleManageStudents}
+                      className="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Students
+                    </button>
                   </div>
                 ) : (
-                  <div className="divide-y divide-gray-200">
+                  <div className="bg-white border border-gray-100 rounded-lg divide-y divide-gray-100">
                     {batch.students.map((student) => (
-                      <div key={student.id} className="px-6 py-4 flex items-center justify-between">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
-                              <span className="text-sm font-medium text-purple-600">
-                                {student.name.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
+                      <div key={student.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-100">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-bold text-white">
+                              {student.name.charAt(0).toUpperCase()}
+                            </span>
                           </div>
-                          <div className="ml-4">
-                            <p className="text-sm font-medium text-gray-900">{student.name}</p>
+                          <div>
+                            <p className="font-medium text-gray-800">{student.name}</p>
                             <p className="text-sm text-gray-500">{student.email}</p>
+                            {student.enrolled_at && (
+                              <p className="text-xs text-green-600">
+                                Enrolled {formatDate(student.enrolled_at)}
+                              </p>
+                            )}
                           </div>
                         </div>
                         
-                        <div className="flex items-center space-x-4">
-                          {student.enrolled_at && (
-                            <span className="text-xs text-gray-500">
-                              Enrolled {formatDate(student.enrolled_at)}
-                            </span>
-                          )}
-                          <button
-                            onClick={() => handleRemoveStudent(student.id, student.name)}
-                            className="inline-flex items-center p-1 border border-transparent rounded-full text-red-400 hover:text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                          >
-                            <UserMinus className="h-4 w-4" />
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => handleRemoveStudent(student.id, student.name)}
+                          className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          <UserMinus className="h-4 w-4" />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -498,33 +477,34 @@ export default function BatchShow({
             )}
 
             {activeTab === 'activity' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-6">
                 {/* Recent Classes */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-medium text-gray-900">Recent Classes</h3>
+                <div className="bg-white border border-gray-100 rounded-lg">
+                  <div className="px-6 py-4 border-b border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                      <Video className="h-5 w-5 mr-2 text-green-500" />
+                      Recent Classes
+                    </h3>
                   </div>
                   
                   {recentClasses.length === 0 ? (
-                    <div className="text-center py-8">
-                      <Video className="mx-auto h-8 w-8 text-gray-400" />
-                      <p className="mt-2 text-sm text-gray-500">No classes scheduled yet</p>
+                    <div className="px-6 py-8 text-center">
+                      <Video className="mx-auto h-8 w-8 text-gray-500 mb-2" />
+                      <p className="text-sm text-gray-500">No classes scheduled yet</p>
                     </div>
                   ) : (
-                    <div className="divide-y divide-gray-200">
+                    <div className="divide-y divide-gray-100">
                       {recentClasses.map((classItem) => (
-                        <div key={classItem.id} className="px-6 py-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">{classItem.title}</p>
-                              <p className="text-xs text-gray-500">
-                                {formatDateTime(classItem.scheduled_at)}
-                              </p>
-                            </div>
-                            <span className={getStatusBadge(classItem.status)}>
-                              {classItem.status}
-                            </span>
+                        <div key={classItem.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-100">
+                          <div>
+                            <p className="font-medium text-gray-800">{classItem.title}</p>
+                            <p className="text-sm text-gray-500">
+                              {formatDateTime(classItem.scheduled_at)}
+                            </p>
                           </div>
+                          <span className={getStatusBadge(classItem.status)}>
+                            {classItem.status}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -532,31 +512,32 @@ export default function BatchShow({
                 </div>
 
                 {/* Recent Quizzes */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-medium text-gray-900">Recent Quizzes</h3>
+                <div className="bg-white border border-gray-100 rounded-lg">
+                  <div className="px-6 py-4 border-b border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                      <FileQuestion className="h-5 w-5 mr-2 text-green-500" />
+                      Recent Quizzes
+                    </h3>
                   </div>
                   
                   {recentQuizzes.length === 0 ? (
-                    <div className="text-center py-8">
-                      <FileQuestion className="mx-auto h-8 w-8 text-gray-400" />
-                      <p className="mt-2 text-sm text-gray-500">No quizzes created yet</p>
+                    <div className="px-6 py-8 text-center">
+                      <FileQuestion className="mx-auto h-8 w-8 text-gray-500 mb-2" />
+                      <p className="text-sm text-gray-500">No quizzes created yet</p>
                     </div>
                   ) : (
-                    <div className="divide-y divide-gray-200">
+                    <div className="divide-y divide-gray-100">
                       {recentQuizzes.map((quiz) => (
-                        <div key={quiz.id} className="px-6 py-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">{quiz.title}</p>
-                              <p className="text-xs text-gray-500">
-                                {quiz.questions_count} questions • {quiz.attempts_count} attempts
-                              </p>
-                            </div>
-                            <span className={getStatusBadge(quiz.status)}>
-                              {quiz.status}
-                            </span>
+                        <div key={quiz.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-100">
+                          <div>
+                            <p className="font-medium text-gray-800">{quiz.title}</p>
+                            <p className="text-sm text-gray-500">
+                              {quiz.questions_count} questions • {quiz.attempts_count} attempts
+                            </p>
                           </div>
+                          <span className={getStatusBadge(quiz.status)}>
+                            {quiz.status}
+                          </span>
                         </div>
                       ))}
                     </div>

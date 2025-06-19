@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\StaffRegisterRequest;
 use App\Models\User;
 use App\Models\ActivityLog;
+use App\Models\Batch;
 use App\Enums\UserRole;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -14,6 +16,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,108 +25,139 @@ use Exception;
 class RegisteredUserController extends Controller
 {
     /**
-     * Display the registration view.
+     * Display the student registration view.
      */
     public function create(): Response
     {
-        return Inertia::render('Auth/Register');
+        // Get available batches for student selection
+        $batches = Batch::with('teacher:id,name')
+            ->where('is_active', true)
+            ->select('id', 'name', 'description', 'teacher_id', 'max_students', 'fee')
+            ->withCount('students')
+            ->get()
+            ->map(function ($batch) {
+                return [
+                    'id' => $batch->id,
+                    'name' => $batch->name,
+                    'description' => $batch->description,
+                    'teacher' => $batch->teacher->name ?? 'Unknown',
+                    'fee' => $batch->fee ?? 'Contact for pricing',
+                    'students_count' => $batch->students_count ?? 0,
+                    'max_students' => $batch->max_students ?? 30,
+                    'is_full' => ($batch->students_count ?? 0) >= ($batch->max_students ?? 30),
+                ];
+            });
+
+        return Inertia::render('Auth/Register', [
+            'batches' => $batches
+        ]);
     }
 
     /**
-     * Handle an incoming registration request.
-     *
-     * @throws \Illuminate\Validation\ValidationException
+     * Display the staff registration view.
+     */
+    public function createStaff(): Response
+    {
+        return Inertia::render('Auth/AdminTeacherRegister');
+    }
+
+    /**
+     * Handle student registration.
      */
     public function store(RegisterRequest $request): RedirectResponse
     {
-        Log::info('=== REGISTRATION ATTEMPT STARTED ===', [
+        Log::info('=== STUDENT REGISTRATION ATTEMPT ===', [
             'email' => $request->email,
-            'role' => $request->role,
             'name' => $request->name,
-            'phone' => $request->phone,
+            'batch_id' => $request->batch_id,
             'ip' => $request->ip()
         ]);
 
         try {
-            // Start database transaction
             DB::beginTransaction();
 
-            // Prepare user data with detailed logging
+            // Validate batch selection and file upload for students
+            $request->validate([
+                'batch_id' => 'required|exists:batches,id',
+                'class_id' => 'required|string',
+                'bank_slip' => 'required|file|mimes:jpeg,png,jpg,pdf|max:2048',
+            ], [
+                'batch_id.required' => 'Please select a batch.',
+                'batch_id.exists' => 'Selected batch is not available.',
+                'class_id.required' => 'Please select a class type.',
+                'bank_slip.required' => 'Please upload your payment slip.',
+                'bank_slip.mimes' => 'Payment slip must be an image (JPEG, PNG, JPG) or PDF.',
+                'bank_slip.max' => 'Payment slip file size cannot exceed 2MB.',
+            ]);
+
+            // Check if batch is full
+            $batch = Batch::withCount('students')->findOrFail($request->batch_id);
+            if (($batch->students_count ?? 0) >= ($batch->max_students ?? 30)) {
+                return back()->withErrors([
+                    'batch_id' => 'Selected batch is currently full. Please choose another batch.'
+                ])->withInput();
+            }
+
+            // Handle bank slip upload
+            $bankSlipPath = null;
+            if ($request->hasFile('bank_slip')) {
+                $bankSlipPath = $request->file('bank_slip')->store('bank_slips', 'public');
+                Log::info('Bank slip uploaded', ['path' => $bankSlipPath]);
+            }
+
+            // Create student user (pending approval)
             $userData = [
                 'name' => trim($request->name),
                 'email' => strtolower(trim($request->email)),
                 'phone' => trim($request->phone),
                 'password' => Hash::make($request->password),
-                'role' => $request->role,
+                'role' => UserRole::STUDENT->value,
+                'batch_id' => $request->batch_id,
+                'class_id' => $request->class_id,
+                'bank_slip_path' => $bankSlipPath,
                 'email_verified_at' => now(),
-                'is_active' => true,
+                'is_active' => false,    // Inactive until approved
+                'is_approved' => false,  // Pending approval
             ];
 
-            Log::info('Creating user with data:', [
-                'name' => $userData['name'],
-                'email' => $userData['email'],
-                'phone' => $userData['phone'],
-                'role' => $userData['role'],
-                'is_active' => $userData['is_active']
-            ]);
-
-            // Create the user
             $user = User::create($userData);
 
-            if (!$user) {
-                throw new Exception('Failed to create user - User::create returned null');
-            }
-
-            Log::info('User created successfully', [
+            Log::info('Student user created (pending approval)', [
                 'user_id' => $user->id,
                 'email' => $user->email,
-                'role' => $user->role instanceof UserRole ? $user->role->value : $user->role,
-                'is_active' => $user->is_active
+                'batch_id' => $user->batch_id,
+                'bank_slip_path' => $user->bank_slip_path
             ]);
 
-            // Log user registration activity
-            $this->logRegistrationActivity($user, $request);
+            // Log registration activity
+            $this->logRegistrationActivity($user, $request, 'student_registration_pending');
 
             // Fire the registered event
             event(new Registered($user));
 
-            // Log the user in
-            Auth::login($user);
-
-            // Log successful login after registration
-            $this->logLoginActivity($user, $request);
-
-            // Commit the transaction
             DB::commit();
 
-            // Log successful registration
-            Log::info('User registered successfully', [
-                'user_id' => $user->id,
-                'email' => $user->email,
-                'role' => $user->role instanceof UserRole ? $user->role->value : $user->role,
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-            ]);
-
-            // Redirect based on user role
-            return $this->redirectUserBasedOnRole($user);
+            // Redirect to login with pending approval message (DO NOT auto-login)
+            return redirect()->route('login')->with('success', 
+                'Registration successful! Your account is pending approval. You will be notified via email once your payment is verified and account is approved.'
+            )->with('info',
+                'Please wait for admin approval before attempting to log in. This usually takes 24-48 hours.'
+            );
 
         } catch (Exception $e) {
-            // Rollback the transaction
             DB::rollBack();
 
-            // Log the detailed error
-            Log::error('User registration failed', [
+            // Delete uploaded file if registration fails
+            if (isset($bankSlipPath) && $bankSlipPath) {
+                Storage::disk('public')->delete($bankSlipPath);
+            }
+
+            Log::error('Student registration failed', [
                 'email' => $request->email ?? 'N/A',
-                'error_message' => $e->getMessage(),
-                'error_file' => $e->getFile(),
-                'error_line' => $e->getLine(),
-                'stack_trace' => $e->getTraceAsString(),
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
-            // Return back with detailed error
             return back()->withErrors([
                 'registration' => 'Registration failed: ' . $e->getMessage()
             ])->withInput($request->except('password', 'password_confirmation'));
@@ -131,84 +165,183 @@ class RegisteredUserController extends Controller
     }
 
     /**
-     * Redirect user to appropriate dashboard based on their role
+     * Handle staff (teacher/admin) registration.
      */
-    private function redirectUserBasedOnRole(User $user): RedirectResponse
+    public function storeStaff(StaffRegisterRequest $request): RedirectResponse
     {
-        // Generate personalized welcome message
-        $welcomeMessage = $this->generateWelcomeMessage($user);
-        
-        // Handle both enum and string roles safely
+        Log::info('=== STAFF REGISTRATION ATTEMPT ===', [
+            'email' => $request->email,
+            'name' => $request->name,
+            'role' => $request->role,
+            'ip' => $request->ip()
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Create staff user (auto-approved)
+            $userData = [
+                'name' => trim($request->name),
+                'email' => strtolower(trim($request->email)),
+                'phone' => trim($request->phone),
+                'password' => Hash::make($request->password),
+                'role' => $request->role,
+                'email_verified_at' => now(),
+                'is_active' => true,     // Auto-active for staff
+                'is_approved' => true,   // Auto-approved for staff
+            ];
+
+            // Add role-specific fields
+            if ($request->role === UserRole::TEACHER->value && $request->specialization) {
+                $userData['specialization'] = trim($request->specialization);
+            }
+
+            if ($request->role === UserRole::ADMIN->value && $request->department) {
+                $userData['department'] = trim($request->department);
+            }
+
+            $user = User::create($userData);
+
+            Log::info('Staff user created and auto-approved', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'role' => $user->role,
+                'specialization' => $user->specialization ?? null,
+                'department' => $user->department ?? null
+            ]);
+
+            // Log registration activity
+            $this->logRegistrationActivity($user, $request, 'staff_registration_approved');
+
+            // Fire the registered event
+            event(new Registered($user));
+
+            // Auto-login staff users
+            Auth::login($user);
+
+            // Log auto-login activity
+            $this->logLoginActivity($user, $request);
+
+            DB::commit();
+
+            Log::info('Staff registration completed with auto-login', [
+                'user_id' => $user->id,
+                'role' => $user->role,
+                'redirect_to' => $this->getStaffDashboardRoute($user)
+            ]);
+
+            // Redirect to appropriate dashboard based on role
+            return $this->redirectStaffToDashboard($user);
+
+        } catch (Exception $e) {
+            DB::rollBack();
+
+            Log::error('Staff registration failed', [
+                'email' => $request->email ?? 'N/A',
+                'role' => $request->role ?? 'N/A',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return back()->withErrors([
+                'registration' => 'Registration failed: ' . $e->getMessage()
+            ])->withInput($request->except('password', 'password_confirmation'));
+        }
+    }
+
+    /**
+     * Redirect staff user to appropriate dashboard
+     */
+    private function redirectStaffTodashboard(User $user): RedirectResponse
+    {
+        $welcomeMessage = $this->generateStaffWelcomeMessage($user);
         $roleValue = $user->role instanceof UserRole ? $user->role->value : $user->role;
         
         switch ($roleValue) {
             case 'admin':
                 return redirect()->route('admin.dashboard')
                     ->with('success', $welcomeMessage)
-                    ->with('user_role', 'admin')
                     ->with('first_login', true);
             
             case 'teacher':
                 return redirect()->route('teacher.dashboard')
                     ->with('success', $welcomeMessage)
-                    ->with('user_role', 'teacher')
                     ->with('first_login', true)
                     ->with('getting_started', 'Create your first batch to get started with teaching!');
             
-            case 'student':
-                return redirect()->route('student.dashboard')
-                    ->with('success', $welcomeMessage)
-                    ->with('user_role', 'student')
-                    ->with('first_login', true)
-                    ->with('getting_started', 'Explore available classes and start learning!');
-            
             default:
                 return redirect()->route('dashboard')
-                    ->with('success', 'Welcome to Micro LMS! Your account has been created successfully.')
+                    ->with('success', 'Welcome to Micro LMS!')
                     ->with('first_login', true);
         }
     }
 
     /**
-     * Generate personalized welcome message
+     * Generate staff welcome message
      */
-    private function generateWelcomeMessage(User $user): string
+    private function generateStaffWelcomeMessage(User $user): string
     {
         $firstName = explode(' ', $user->name)[0];
+        $roleDisplay = $user->role instanceof UserRole ? $user->role->getDisplayName() : ucfirst($user->role);
         
-        try {
-            $roleDisplayName = $user->role instanceof UserRole ? $user->role->getDisplayName() : ucfirst($user->role);
-        } catch (Exception $e) {
-            $roleDisplayName = 'User';
-        }
+        return "Welcome to Micro LMS, {$firstName}! Your {$roleDisplay} account has been created and activated. Let's get you started!";
+    }
+
+    /**
+     * Get staff dashboard route
+     */
+    private function getStaffDashboardRoute(User $user): string
+    {
+        $roleValue = $user->role instanceof UserRole ? $user->role->value : $user->role;
         
-        return "Welcome to Micro LMS, {$firstName}! Your {$roleDisplayName} account has been created successfully. Let's get you started!";
+        return match($roleValue) {
+            'admin' => route('admin.dashboard'),
+            'teacher' => route('teacher.dashboard'),
+            default => route('dashboard')
+        };
     }
 
     /**
      * Log user registration activity
      */
-    private function logRegistrationActivity(User $user, Request $request): void
+    private function logRegistrationActivity(User $user, Request $request, string $activityType): void
     {
         try {
             $roleDisplayName = $user->role instanceof UserRole ? $user->role->getDisplayName() : ucfirst($user->role);
             $roleValue = $user->role instanceof UserRole ? $user->role->value : $user->role;
             
+            $metadata = [
+                'role' => $roleValue,
+                'email' => $user->email,
+                'registration_method' => 'web_form',
+                'timestamp' => now()->toISOString(),
+            ];
+
+            // Add student-specific metadata
+            if ($user->isStudent()) {
+                $metadata['batch_id'] = $user->batch_id;
+                $metadata['class_id'] = $user->class_id;
+                $metadata['has_bank_slip'] = !empty($user->bank_slip_path);
+                $metadata['approval_status'] = $user->is_approved ? 'approved' : 'pending';
+            }
+
+            // Add staff-specific metadata
+            if ($user->isTeacher() && $user->specialization) {
+                $metadata['specialization'] = $user->specialization;
+            }
+            if ($user->isAdmin() && $user->department) {
+                $metadata['department'] = $user->department;
+            }
+            
             ActivityLog::create([
                 'user_id' => $user->id,
-                'activity_type' => 'user_registration',
+                'activity_type' => $activityType,
                 'description' => "User registered with role: {$roleDisplayName}",
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
-                'metadata' => json_encode([
-                    'role' => $roleValue,
-                    'email' => $user->email,
-                    'registration_method' => 'web_form',
-                    'timestamp' => now()->toISOString(),
-                ]),
+                'metadata' => json_encode($metadata),
             ]);
         } catch (Exception $e) {
-            // Log error but don't fail registration
             Log::warning('Failed to log registration activity', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
@@ -225,16 +358,16 @@ class RegisteredUserController extends Controller
             ActivityLog::create([
                 'user_id' => $user->id,
                 'activity_type' => 'user_login',
-                'description' => 'First login after registration',
+                'description' => 'Auto-login after staff registration',
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
                 'metadata' => json_encode([
                     'login_type' => 'auto_after_registration',
+                    'role' => $user->role instanceof UserRole ? $user->role->value : $user->role,
                     'timestamp' => now()->toISOString(),
                 ]),
             ]);
         } catch (Exception $e) {
-            // Log error but don't fail registration
             Log::warning('Failed to log login activity', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
@@ -243,84 +376,149 @@ class RegisteredUserController extends Controller
     }
 
     /**
-     * Get registration statistics (for admin dashboard)
+     * Get pending approval students (for admin/teacher dashboard)
      */
-    public function getRegistrationStats(): array
+    public function getPendingApprovals()
     {
         try {
-            return [
-                'total_registrations' => User::count(),
-                'registrations_today' => User::whereDate('created_at', today())->count(),
-                'registrations_this_week' => User::where('created_at', '>=', now()->startOfWeek())->count(),
-                'registrations_this_month' => User::where('created_at', '>=', now()->startOfMonth())->count(),
-                'by_role' => [
-                    'students' => User::where('role', UserRole::STUDENT->value)->count(),
-                    'teachers' => User::where('role', UserRole::TEACHER->value)->count(),
-                    'admins' => User::where('role', UserRole::ADMIN->value)->count(),
-                ],
-                'recent_registrations' => User::latest()
-                    ->take(5)
-                    ->select('id', 'name', 'email', 'role', 'created_at')
-                    ->get()
-                    ->toArray(),
-            ];
+            $pendingStudents = User::students()
+                ->pendingApproval()
+                ->with(['batch:id,name'])
+                ->select('id', 'name', 'email', 'phone', 'batch_id', 'class_id', 'bank_slip_path', 'created_at')
+                ->latest()
+                ->get()
+                ->map(function ($student) {
+                    return [
+                        'id' => $student->id,
+                        'name' => $student->name,
+                        'email' => $student->email,
+                        'phone' => $student->phone,
+                        'batch' => $student->batch ? [
+                            'id' => $student->batch->id,
+                            'name' => $student->batch->name,
+                        ] : null,
+                        'class_id' => $student->class_id,
+                        'bank_slip_url' => $student->bank_slip_url,
+                        'registered_at' => $student->created_at->format('M j, Y g:i A'),
+                        'days_pending' => $student->created_at->diffInDays(now()),
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'pending_students' => $pendingStudents,
+                'total_pending' => $pendingStudents->count()
+            ]);
         } catch (Exception $e) {
-            Log::error('Failed to get registration stats', ['error' => $e->getMessage()]);
-            return [];
+            Log::error('Failed to get pending approvals', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
 
     /**
-     * Check if email domain is allowed (if you want to restrict domains)
+     * Approve student registration
      */
-    private function isAllowedEmailDomain(string $email): bool
+    public function approveStudent(Request $request, User $student)
     {
-        // Add your domain restrictions here if needed
-        $allowedDomains = config('auth.allowed_email_domains', []);
-        
-        if (empty($allowedDomains)) {
-            return true; // No restrictions
-        }
-        
-        $domain = substr(strrchr($email, "@"), 1);
-        return in_array($domain, $allowedDomains);
-    }
-
-    /**
-     * Generate user initials for avatar
-     */
-    private function generateUserInitials(string $name): string
-    {
-        $words = explode(' ', trim($name));
-        $initials = '';
-        
-        foreach ($words as $word) {
-            if (!empty($word)) {
-                $initials .= strtoupper(substr($word, 0, 1));
+        try {
+            if (!$student->isStudent() || $student->isApproved()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Student is not eligible for approval'
+                ], 400);
             }
+
+            $student->approve();
+
+            Log::info('Student approved', [
+                'student_id' => $student->id,
+                'approved_by' => auth()->id(),
+                'student_email' => $student->email
+            ]);
+
+            // Log approval activity
+            ActivityLog::create([
+                'user_id' => $student->id,
+                'activity_type' => 'student_approved',
+                'description' => 'Student registration approved by ' . auth()->user()->name,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'metadata' => json_encode([
+                    'approved_by' => auth()->id(),
+                    'approved_by_name' => auth()->user()->name,
+                    'approved_at' => now()->toISOString(),
+                ]),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Student approved successfully'
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('Failed to approve student', [
+                'student_id' => $student->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to approve student'
+            ], 500);
         }
-        
-        return substr($initials, 0, 2); // Max 2 initials
     }
 
     /**
-     * Send welcome notification (if you implement notification system)
+     * Reject student registration
      */
-    private function sendWelcomeNotification(User $user): void
+    public function rejectStudent(Request $request, User $student)
     {
         try {
-            // You can implement this when you add notification system
-            // $user->notify(new WelcomeNotification());
-            
-            Log::info('Welcome notification queued for user', [
-                'user_id' => $user->id,
-                'email' => $user->email,
+            if (!$student->isStudent() || $student->isApproved()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Student is not eligible for rejection'
+                ], 400);
+            }
+
+            $student->reject();
+
+            Log::info('Student rejected', [
+                'student_id' => $student->id,
+                'rejected_by' => auth()->id(),
+                'student_email' => $student->email
             ]);
+
+            // Log rejection activity
+            ActivityLog::create([
+                'user_id' => $student->id,
+                'activity_type' => 'student_rejected',
+                'description' => 'Student registration rejected by ' . auth()->user()->name,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'metadata' => json_encode([
+                    'rejected_by' => auth()->id(),
+                    'rejected_by_name' => auth()->user()->name,
+                    'rejected_at' => now()->toISOString(),
+                    'reason' => $request->reason ?? 'No reason provided',
+                ]),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Student registration rejected'
+            ]);
+
         } catch (Exception $e) {
-            Log::warning('Failed to send welcome notification', [
-                'user_id' => $user->id,
-                'error' => $e->getMessage(),
+            Log::error('Failed to reject student', [
+                'student_id' => $student->id,
+                'error' => $e->getMessage()
             ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to reject student'
+            ], 500);
         }
     }
 }

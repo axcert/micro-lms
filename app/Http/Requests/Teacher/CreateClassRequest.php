@@ -4,17 +4,20 @@ namespace App\Http\Requests\Teacher;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use App\Enums\UserRole;
+use App\Models\Batch;
+use App\Models\Lesson;
 
 class CreateClassRequest extends FormRequest
 {
     public function authorize()
     {
-        return auth()->user()->role === 'teacher';
+        return auth()->user()->role === UserRole::TEACHER;
     }
 
     public function rules()
     {
-        $classId = $this->route('class')?->id;
+        $classId = $this->route('id'); // Get ID from route parameter
         
         return [
             'title' => 'required|string|max:255',
@@ -26,13 +29,20 @@ class CreateClassRequest extends FormRequest
                     $query->where('teacher_id', auth()->id());
                 })
             ],
-            'scheduled_at' => 'required|date|after:now',
+            'scheduled_at' => [
+                'required',
+                'date',
+                'after:now',
+                function ($attribute, $value, $fail) use ($classId) {
+                    $this->validateSchedulingConflicts($attribute, $value, $fail, $classId);
+                },
+            ],
             'duration_minutes' => 'required|integer|min:15|max:480', // 15 min to 8 hours
             'zoom_password' => 'nullable|string|min:6|max:10',
             'max_attendees' => 'nullable|integer|min:1|max:1000',
             'notes' => 'nullable|string|max:2000',
             'create_attendance' => 'boolean',
-            'status' => 'nullable|in:scheduled,live,completed,cancelled,rescheduled'
+            'status' => 'nullable|in:scheduled,live,ongoing,completed,cancelled,rescheduled'
         ];
     }
 
@@ -79,46 +89,20 @@ class CreateClassRequest extends FormRequest
         }
     }
 
-    protected function passedValidation()
+    /**
+     * Validate scheduling conflicts
+     */
+    protected function validateSchedulingConflicts($attribute, $value, $fail, $classId = null)
     {
-        // Additional validation after basic rules pass
-        
-        // Check if teacher owns the batch
-        $batch = \App\Models\Batch::find($this->batch_id);
-        if ($batch && $batch->teacher_id !== auth()->id()) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'batch_id' => 'You do not have permission to schedule classes for this batch.'
-            ]);
-        }
-
-        // Check for scheduling conflicts (optional)
-        if ($this->shouldCheckConflicts()) {
-            $this->checkSchedulingConflicts();
-        }
-    }
-
-    protected function shouldCheckConflicts()
-    {
-        // Only check conflicts if it's a new class or the date/time has changed
-        if ($this->isMethod('POST')) {
-            return true; // New class
-        }
-
-        // For updates, check if scheduled_at has changed
-        $class = $this->route('class');
-        return $class && $class->scheduled_at->format('Y-m-d H:i') !== date('Y-m-d H:i', strtotime($this->scheduled_at));
-    }
-
-    protected function checkSchedulingConflicts()
-    {
-        $classId = $this->route('class')?->id;
-        $scheduledAt = \Carbon\Carbon::parse($this->scheduled_at);
+        $scheduledAt = \Carbon\Carbon::parse($value);
         $endTime = $scheduledAt->copy()->addMinutes($this->duration_minutes);
 
         // Check for overlapping classes for the same teacher
-        $conflictingClass = \App\Models\ClassModel::where('teacher_id', auth()->id())
+        $conflictingClass = Lesson::whereHas('batch', function ($query) {
+                $query->where('teacher_id', auth()->id());
+            })
             ->where('id', '!=', $classId)
-            ->whereIn('status', ['scheduled', 'live', 'rescheduled'])
+            ->whereIn('status', ['scheduled', 'live', 'ongoing', 'rescheduled'])
             ->where(function ($query) use ($scheduledAt, $endTime) {
                 $query->where(function ($q) use ($scheduledAt, $endTime) {
                     // New class starts during existing class
@@ -137,9 +121,50 @@ class CreateClassRequest extends FormRequest
             ->first();
 
         if ($conflictingClass) {
+            $fail("This time conflicts with another class: \"{$conflictingClass->title}\" scheduled at " . 
+                 $conflictingClass->scheduled_at->format('M j, Y g:i A'));
+        }
+
+        // Check for batch conflicts (same batch, overlapping time)
+        $batchConflict = Lesson::where('batch_id', $this->batch_id)
+            ->where('id', '!=', $classId)
+            ->whereIn('status', ['scheduled', 'live', 'ongoing', 'rescheduled'])
+            ->where(function ($query) use ($scheduledAt, $endTime) {
+                $query->where(function ($q) use ($scheduledAt, $endTime) {
+                    $q->where('scheduled_at', '<=', $scheduledAt)
+                      ->whereRaw('DATE_ADD(scheduled_at, INTERVAL duration_minutes MINUTE) > ?', [$scheduledAt]);
+                })->orWhere(function ($q) use ($scheduledAt, $endTime) {
+                    $q->where('scheduled_at', '<', $endTime)
+                      ->whereRaw('DATE_ADD(scheduled_at, INTERVAL duration_minutes MINUTE) >= ?', [$endTime]);
+                })->orWhere(function ($q) use ($scheduledAt, $endTime) {
+                    $q->where('scheduled_at', '>=', $scheduledAt)
+                      ->whereRaw('DATE_ADD(scheduled_at, INTERVAL duration_minutes MINUTE) <= ?', [$endTime]);
+                });
+            })
+            ->first();
+
+        if ($batchConflict) {
+            $fail("This batch already has a class scheduled at this time: \"{$batchConflict->title}\" at " . 
+                 $batchConflict->scheduled_at->format('M j, Y g:i A'));
+        }
+    }
+
+    protected function passedValidation()
+    {
+        // Additional validation after basic rules pass
+        
+        // Check if teacher owns the batch
+        $batch = Batch::find($this->batch_id);
+        if ($batch && $batch->teacher_id !== auth()->id()) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'scheduled_at' => "This time conflicts with another class: \"{$conflictingClass->title}\" scheduled at " . 
-                                 $conflictingClass->scheduled_at->format('M j, Y g:i A')
+                'batch_id' => 'You do not have permission to schedule classes for this batch.'
+            ]);
+        }
+
+        // Check if batch has approved students
+        if ($batch && $batch->students()->approved()->count() === 0) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'batch_id' => 'This batch has no approved students. Please wait for students to be approved or select a different batch.'
             ]);
         }
     }
