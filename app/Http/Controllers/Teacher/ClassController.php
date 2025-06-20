@@ -95,23 +95,18 @@ class ClassController extends Controller
         $teacher = Auth::user();
         
         try {
-            // Get teacher's batches with student counts
-            $batches = DB::table('batches')
-                ->where('teacher_id', $teacher->id)
+            // Get teacher's batches with student counts - optimized query
+            $batches = Batch::where('teacher_id', $teacher->id)
                 ->where('is_active', 1)
+                ->withCount('students')
+                ->select('id', 'name', 'description')
                 ->get()
                 ->map(function ($batch) {
-                    // Get student count from batch_students table
-                    $studentCount = DB::table('batch_students')
-                        ->where('batch_id', $batch->id)
-                        ->count();
-                    
                     return [
                         'id' => $batch->id,
                         'name' => $batch->name,
-                        'student_count' => $studentCount,
+                        'student_count' => $batch->students_count,
                         'description' => $batch->description ?? '',
-                        'students' => []
                     ];
                 });
 
@@ -178,58 +173,60 @@ class ClassController extends Controller
                 ])->withInput();
             }
 
-            // Prepare class data
-            $classData = [
-                'title' => $validated['title'],
-                'description' => $validated['description'],
-                'batch_id' => $validated['batch_id'],
-                'scheduled_at' => Carbon::parse($validated['scheduled_at']),
-                'duration_minutes' => $validated['duration_minutes'],
-                'status' => 'scheduled',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
+            // Use DB transaction for data consistency
+            DB::beginTransaction();
 
-            // Add optional fields if they exist in the table
-            if (Schema::hasColumn('classes', 'teacher_id')) {
-                $classData['teacher_id'] = $teacher->id;
-            }
+            try {
+                // Create the class using Eloquent model
+                $class = new Lesson();
+                $class->title = $validated['title'];
+                $class->description = $validated['description'];
+                $class->batch_id = $validated['batch_id'];
+                $class->scheduled_at = Carbon::parse($validated['scheduled_at']);
+                $class->duration_minutes = $validated['duration_minutes'];
+                $class->status = 'scheduled';
+                
+                // Add optional fields if they exist
+                if (Schema::hasColumn('classes', 'teacher_id')) {
+                    $class->teacher_id = $teacher->id;
+                }
+                if (isset($validated['zoom_link']) && Schema::hasColumn('classes', 'zoom_link')) {
+                    $class->zoom_link = $validated['zoom_link'];
+                }
+                if (isset($validated['notes']) && Schema::hasColumn('classes', 'notes')) {
+                    $class->notes = $validated['notes'];
+                }
+                
+                $class->save();
 
-            if (isset($validated['zoom_link']) && Schema::hasColumn('classes', 'zoom_link')) {
-                $classData['zoom_link'] = $validated['zoom_link'];
-            }
+                // Create attendance records if requested
+                if ($request->boolean('create_attendance')) {
+                    $students = $batch->students()->pluck('user_id');
+                    
+                    $attendanceRecords = $students->map(function ($studentId) use ($class) {
+                        return [
+                            'class_id' => $class->id,
+                            'user_id' => $studentId,
+                            'status' => 'absent',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ];
+                    })->toArray();
 
-            if (isset($validated['notes']) && Schema::hasColumn('classes', 'notes')) {
-                $classData['notes'] = $validated['notes'];
-            }
-
-            // Create the class
-            $classId = DB::table('classes')->insertGetId($classData);
-
-            // Create attendance records if requested
-            if ($request->boolean('create_attendance')) {
-                $students = DB::table('batch_students')
-                    ->where('batch_id', $validated['batch_id'])
-                    ->get();
-
-                $attendanceRecords = [];
-                foreach ($students as $student) {
-                    $attendanceRecords[] = [
-                        'class_id' => $classId,
-                        'user_id' => $student->user_id,
-                        'status' => 'absent',
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
+                    if (!empty($attendanceRecords)) {
+                        Attendance::insert($attendanceRecords);
+                    }
                 }
 
-                if (!empty($attendanceRecords)) {
-                    DB::table('attendance')->insert($attendanceRecords);
-                }
-            }
+                DB::commit();
 
-            return redirect()->route('teacher.classes.index')
-                           ->with('success', 'Class scheduled successfully!');
+                return redirect()->route('teacher.classes.index')
+                               ->with('success', 'Class scheduled successfully!');
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
                            
         } catch (\Illuminate\Validation\ValidationException $e) {
             return back()->withErrors($e->errors())->withInput();
@@ -237,7 +234,8 @@ class ClassController extends Controller
         } catch (\Exception $e) {
             Log::error('Class creation failed', [
                 'teacher_id' => $teacher->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             
             return back()
@@ -254,25 +252,42 @@ class ClassController extends Controller
         $teacher = Auth::user();
         
         try {
+            // Optimized query to get class with all related data
             $class = Lesson::with([
-                'batch:id,name,teacher_id',
-                'attendance.user:id,name,email'
+                'batch:id,name,teacher_id,description',
+                'attendances.user:id,name,email'
             ])
             ->whereHas('batch', function ($query) use ($teacher) {
                 $query->where('teacher_id', $teacher->id);
             })
             ->findOrFail($id);
 
-            // Get students in this batch
-            $students = DB::table('batch_students')
-                ->join('users', 'batch_students.user_id', '=', 'users.id')
-                ->where('batch_students.batch_id', $class->batch_id)
+            // Get students in this batch with better query
+            $students = $class->batch->students()
                 ->select('users.id', 'users.name', 'users.email')
                 ->get();
 
+            // Calculate attendance stats
+            $attendanceStats = [
+                'total_students' => $students->count(),
+                'present_count' => $class->attendances->where('status', 'present')->count(),
+                'absent_count' => $class->attendances->where('status', 'absent')->count(),
+                'late_count' => $class->attendances->where('status', 'late')->count(),
+            ];
+            $attendanceStats['attendance_rate'] = $attendanceStats['total_students'] > 0 
+                ? round(($attendanceStats['present_count'] / $attendanceStats['total_students']) * 100, 1)
+                : 0;
+
+            // Add formatted fields
+            $class->formatted_duration = $this->formatDuration($class->duration_minutes);
+            $class->can_start = $this->canStartClass($class);
+            $class->is_upcoming = $class->scheduled_at > now();
+            $class->is_completed = $class->status === 'completed';
+
             return Inertia::render('Teacher/Classes/Show', [
-                'class' => $class,
-                'students' => $students,
+                'classData' => $class->toArray(), // Use 'classData' consistently
+                'students' => $students->toArray(),
+                'attendanceStats' => $attendanceStats,
                 'auth' => [
                     'user' => [
                         'id' => $teacher->id,
@@ -283,15 +298,20 @@ class ClassController extends Controller
                 ]
             ]);
             
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return redirect()->route('teacher.classes.index')
+                ->withErrors(['general' => 'Class not found.']);
+                
         } catch (\Exception $e) {
             Log::error('Class show failed', [
                 'class_id' => $id,
                 'teacher_id' => $teacher->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             
             return redirect()->route('teacher.classes.index')
-                ->withErrors(['general' => 'Class not found or access denied.']);
+                ->withErrors(['general' => 'Unable to load class details. Please try again.']);
         }
     }
 
@@ -315,27 +335,24 @@ class ClassController extends Controller
                     ->withErrors(['general' => 'Cannot edit completed or ongoing classes.']);
             }
 
-            // Get teacher's batches
-            $batches = DB::table('batches')
-                ->where('teacher_id', $teacher->id)
+            // Get teacher's batches with optimized query
+            $batches = Batch::where('teacher_id', $teacher->id)
                 ->where('is_active', 1)
+                ->withCount('students')
+                ->select('id', 'name', 'description')
                 ->get()
                 ->map(function ($batch) {
-                    $studentCount = DB::table('batch_students')
-                        ->where('batch_id', $batch->id)
-                        ->count();
-                    
                     return [
                         'id' => $batch->id,
                         'name' => $batch->name,
-                        'student_count' => $studentCount,
+                        'student_count' => $batch->students_count,
                         'description' => $batch->description ?? '',
                     ];
                 });
 
             return Inertia::render('Teacher/Classes/Edit', [
-                'class' => $class,
-                'batches' => $batches,
+                'classData' => $class->toArray(),
+                'batches' => $batches->toArray(),
                 'auth' => [
                     'user' => [
                         'id' => $teacher->id,
@@ -401,25 +418,22 @@ class ClassController extends Controller
                 }
             }
 
-            // Update the class
-            $updateData = [
-                'title' => $validated['title'],
-                'description' => $validated['description'],
-                'batch_id' => $validated['batch_id'],
-                'scheduled_at' => Carbon::parse($validated['scheduled_at']),
-                'duration_minutes' => $validated['duration_minutes'],
-                'updated_at' => now(),
-            ];
+            // Update using Eloquent model
+            $class->title = $validated['title'];
+            $class->description = $validated['description'];
+            $class->batch_id = $validated['batch_id'];
+            $class->scheduled_at = Carbon::parse($validated['scheduled_at']);
+            $class->duration_minutes = $validated['duration_minutes'];
 
             if (isset($validated['zoom_link']) && Schema::hasColumn('classes', 'zoom_link')) {
-                $updateData['zoom_link'] = $validated['zoom_link'];
+                $class->zoom_link = $validated['zoom_link'];
             }
 
             if (isset($validated['notes']) && Schema::hasColumn('classes', 'notes')) {
-                $updateData['notes'] = $validated['notes'];
+                $class->notes = $validated['notes'];
             }
 
-            DB::table('classes')->where('id', $id)->update($updateData);
+            $class->save();
 
             return redirect()->route('teacher.classes.index')
                            ->with('success', 'Class updated successfully!');
@@ -459,14 +473,24 @@ class ClassController extends Controller
                 ]);
             }
 
-            // Delete related attendance records first
-            DB::table('attendance')->where('class_id', $id)->delete();
+            // Use DB transaction for consistency
+            DB::beginTransaction();
             
-            // Delete the class
-            DB::table('classes')->where('id', $id)->delete();
+            try {
+                // Delete related attendance records first
+                $class->attendances()->delete();
+                
+                // Delete the class
+                $class->delete();
+                
+                DB::commit();
 
-            return redirect()->route('teacher.classes.index')
-                           ->with('success', 'Class deleted successfully!');
+                return redirect()->route('teacher.classes.index')
+                               ->with('success', 'Class deleted successfully!');
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
                            
         } catch (\Exception $e) {
             Log::error('Class deletion failed', [
@@ -499,12 +523,8 @@ class ClassController extends Controller
                 ]);
             }
 
-            DB::table('classes')
-                ->where('id', $id)
-                ->update([
-                    'status' => 'completed',
-                    'updated_at' => now()
-                ]);
+            $class->status = 'completed';
+            $class->save();
 
             return back()->with('success', 'Class marked as completed!');
             
@@ -519,5 +539,34 @@ class ClassController extends Controller
                 'general' => 'Failed to mark class as completed.'
             ]);
         }
+    }
+
+    /**
+     * Helper method to format duration
+     */
+    private function formatDuration($minutes)
+    {
+        $hours = floor($minutes / 60);
+        $mins = $minutes % 60;
+        
+        if ($hours > 0) {
+            return $hours . 'h ' . $mins . 'm';
+        }
+        
+        return $mins . ' minutes';
+    }
+
+    /**
+     * Helper method to determine if class can be started
+     */
+    private function canStartClass($class)
+    {
+        $now = now();
+        $scheduledTime = Carbon::parse($class->scheduled_at);
+        
+        // Can start 15 minutes before scheduled time
+        return $class->status === 'scheduled' 
+            && $now >= $scheduledTime->subMinutes(15)
+            && $class->zoom_start_url;
     }
 }

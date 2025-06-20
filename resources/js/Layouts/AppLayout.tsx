@@ -1,7 +1,7 @@
 import React, { ReactNode } from 'react';
 import { Head } from '@inertiajs/react';
 import Navbar from '@/Components/Layout/Navbar';
-import Sidebar from '@/Components/Layout/Sidebar';
+import Sidebar from '@/Components/Layout/TeacherSidebar';
 import { PageProps } from '@/types';
 
 interface AppLayoutProps extends PageProps {

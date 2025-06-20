@@ -18,70 +18,135 @@ class BatchController extends Controller
     /**
      * Display a listing of batches for the authenticated teacher
      */
+    /**
+     * Display a listing of batches for the authenticated teacher
+     */
+   /**
+     * Display a listing of batches for the authenticated teacher
+     */
     public function index(Request $request)
     {
         $teacher = Auth::user();
         
-        $query = Batch::where('teacher_id', $teacher->id)
-            ->withCount(['students', 'classes', 'quizzes']);
-
-        // Search functionality
-        if ($request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->where('name', 'like', '%' . $request->search . '%')
-                  ->orWhere('description', 'like', '%' . $request->search . '%');
-            });
-        }
-
-        // Status filter
-        if ($request->status) {
-            switch ($request->status) {
-                case 'active':
-                    $query->where('is_active', true);
-                    break;
-                case 'inactive':
-                    $query->where('is_active', false);
-                    break;
-                case 'starting_soon':
-                    $query->where('is_active', true)
-                          ->where('start_date', '>', now())
-                          ->where('start_date', '<=', now()->addDays(7));
-                    break;
-            }
-        }
-
-        $batches = $query->orderBy('created_at', 'desc')->paginate(10);
-
-        // Add computed properties to each batch
-        $batches->getCollection()->transform(function ($batch) {
-            $batch->is_full = $batch->max_students && $batch->students_count >= $batch->max_students;
-            return $batch;
-        });
-
-        // Calculate stats
-        $stats = [
-            'total_batches' => Batch::where('teacher_id', $teacher->id)->count(),
-            'active_batches' => Batch::where('teacher_id', $teacher->id)->where('is_active', true)->count(),
-            'total_students' => DB::table('batch_students')
-                ->join('batches', 'batch_students.batch_id', '=', 'batches.id')
-                ->where('batches.teacher_id', $teacher->id)
-                ->count(),
-            'total_classes' => $this->getWeeklyClassesCount($teacher->id)
-        ];
-
-        return Inertia::render('Teacher/Batches/Index', [
-            'batches' => $batches,
-            'stats' => $stats,
-            'filters' => $request->only(['search', 'status']),
-            'flash' => session('flash')
+        // Debug logging
+        Log::info('BatchController::index called', [
+            'teacher_id' => $teacher?->id,
+            'teacher_email' => $teacher?->email,
+            'teacher_role' => $teacher?->role,
+            'auth_check' => auth()->check(),
+            'request_url' => $request->url(),
         ]);
+        
+        try {
+            $query = Batch::where('teacher_id', $teacher->id)
+                ->withCount(['students', 'classes', 'quizzes']);
+
+            // Search functionality
+            if ($request->search) {
+                $query->where(function ($q) use ($request) {
+                    $q->where('name', 'like', '%' . $request->search . '%')
+                      ->orWhere('description', 'like', '%' . $request->search . '%');
+                });
+            }
+
+            // Status filter
+            if ($request->status) {
+                switch ($request->status) {
+                    case 'active':
+                        $query->where('is_active', true);
+                        break;
+                    case 'inactive':
+                        $query->where('is_active', false);
+                        break;
+                    case 'starting_soon':
+                        $query->where('is_active', true)
+                              ->where('start_date', '>', now())
+                              ->where('start_date', '<=', now()->addDays(7));
+                        break;
+                }
+            }
+
+            $batches = $query->orderBy('created_at', 'desc')->paginate(10);
+
+            // Add computed properties to each batch
+            $batches->getCollection()->transform(function ($batch) {
+                $batch->is_full = $batch->max_students && $batch->students_count >= $batch->max_students;
+                return $batch;
+            });
+
+            // Calculate stats
+            $stats = [
+                'total_batches' => Batch::where('teacher_id', $teacher->id)->count(),
+                'active_batches' => Batch::where('teacher_id', $teacher->id)->where('is_active', true)->count(),
+                'total_students' => DB::table('batch_students')
+                    ->join('batches', 'batch_students.batch_id', '=', 'batches.id')
+                    ->where('batches.teacher_id', $teacher->id)
+                    ->count(),
+                'total_classes' => $this->getWeeklyClassesCount($teacher->id)
+            ];
+
+            // Prepare data for Inertia
+            $inertiaData = [
+                'batches' => $batches,
+                'stats' => $stats,
+                'filters' => $request->only(['search', 'status']),
+                'flash' => $request->session()->get('flash'),
+                // EXPLICIT AUTH FALLBACK - in case middleware isn't working
+                'auth' => [
+                    'user' => [
+                        'id' => $teacher->id,
+                        'name' => $teacher->name,
+                        'email' => $teacher->email,
+                        'phone' => $teacher->phone ?? '',
+                        'role' => $teacher->role,
+                        'email_verified_at' => $teacher->email_verified_at,
+                        'created_at' => $teacher->created_at,
+                        'updated_at' => $teacher->updated_at,
+                    ]
+                ]
+            ];
+
+            Log::info('BatchController::index - Sending data to Inertia', [
+                'teacher_id' => $teacher->id,
+                'batch_count' => $batches->total(),
+                'search' => $request->search,
+                'status_filter' => $request->status,
+                'inertia_keys' => array_keys($inertiaData),
+                'has_auth_in_data' => isset($inertiaData['auth']),
+            ]);
+
+            return Inertia::render('Teacher/Batches/Index', $inertiaData);
+
+        } catch (\Exception $e) {
+            Log::error('Error loading batch index', [
+                'teacher_id' => $teacher->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()->route('teacher.dashboard')
+                           ->with('flash', [
+                               'type' => 'error',
+                               'message' => 'Error loading batches. Please try again.'
+                           ]);
+        }
     }
 
     /**
      * Show the form for creating a new batch
      */
+    /**
+     * Show the form for creating a new batch
+     */
     public function create()
     {
+        $teacher = Auth::user();
+        
+        Log::info('BatchController::create called', [
+            'teacher_id' => $teacher?->id,
+            'teacher_email' => $teacher?->email,
+        ]);
+        
         try {
             // Get available students (not assigned to any active batch by this teacher)
             $availableStudents = User::where('role', 'student')
@@ -101,9 +166,25 @@ class BatchController extends Controller
                 'student_count' => $availableStudents->count()
             ]);
 
-            return Inertia::render('Teacher/Batches/Create', [
-                'availableStudents' => $availableStudents
-            ]);
+            $inertiaData = [
+                'availableStudents' => $availableStudents,
+                'flash' => session('flash'),
+                // EXPLICIT AUTH FALLBACK - in case middleware isn't working
+                'auth' => [
+                    'user' => [
+                        'id' => $teacher->id,
+                        'name' => $teacher->name,
+                        'email' => $teacher->email,
+                        'phone' => $teacher->phone ?? '',
+                        'role' => $teacher->role,
+                        'email_verified_at' => $teacher->email_verified_at,
+                        'created_at' => $teacher->created_at,
+                        'updated_at' => $teacher->updated_at,
+                    ]
+                ]
+            ];
+
+            return Inertia::render('Teacher/Batches/Create', $inertiaData);
 
         } catch (\Exception $e) {
             Log::error('Error loading batch create form', [
@@ -589,12 +670,16 @@ class BatchController extends Controller
     /**
      * Export batch data - NEW method for Index.tsx export button
      */
+    /**
+     * Export batch data - FIXED to work without batch ID parameter
+     */
     public function export(Request $request)
     {
         $teacher = Auth::user();
         
         try {
             $query = Batch::where('teacher_id', $teacher->id)
+                ->withCount(['students', 'classes', 'quizzes'])
                 ->with(['students:id,name,email']);
 
             // Apply same filters as index page
@@ -621,23 +706,42 @@ class BatchController extends Controller
                 }
             }
 
-            $batches = $query->get();
+            $batches = $query->orderBy('created_at', 'desc')->get();
 
             // Create CSV content
-            $csvContent = "Batch Name,Description,Start Date,End Date,Status,Max Students,Current Students,Student Names\n";
+            $csvContent = "Batch Name,Description,Start Date,End Date,Status,Max Students,Current Students,Classes,Quizzes,Student Names\n";
             
             foreach ($batches as $batch) {
                 $studentNames = $batch->students->pluck('name')->join('; ');
+                $status = $batch->is_active ? 'Active' : 'Inactive';
+                
+                // Add status details for active batches
+                if ($batch->is_active) {
+                    $today = now();
+                    $startDate = \Carbon\Carbon::parse($batch->start_date);
+                    $diffDays = $startDate->diffInDays($today, false);
+                    
+                    if ($diffDays < 0) {
+                        $status = 'Starts in ' . abs($diffDays) . ' days';
+                    } elseif ($diffDays == 0) {
+                        $status = 'Starting Today';
+                    } else {
+                        $status = 'Active';
+                    }
+                }
+                
                 $csvContent .= sprintf(
-                    "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%d\",\"%s\"\n",
-                    $batch->name,
-                    $batch->description ?? '',
+                    "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%d\",\"%d\",\"%d\",\"%s\"\n",
+                    addslashes($batch->name),
+                    addslashes($batch->description ?? ''),
                     $batch->start_date,
                     $batch->end_date ?? '',
-                    $batch->is_active ? 'Active' : 'Inactive',
+                    $status,
                     $batch->max_students ?? 'Unlimited',
-                    $batch->students->count(),
-                    $studentNames
+                    $batch->students_count,
+                    $batch->classes_count,
+                    $batch->quizzes_count,
+                    addslashes($studentNames)
                 );
             }
 
@@ -649,17 +753,22 @@ class BatchController extends Controller
                 'filename' => $fileName
             ]);
 
-            return response($csvContent)
-                ->header('Content-Type', 'text/csv')
-                ->header('Content-Disposition', 'attachment; filename="' . $fileName . '"');
+            return response($csvContent, 200, [
+                'Content-Type' => 'text/csv; charset=utf-8',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                'Pragma' => 'no-cache',
+                'Expires' => '0'
+            ]);
 
         } catch (\Exception $e) {
             Log::error('Error exporting batches', [
                 'teacher_id' => $teacher->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
-            return back()->withErrors([
+            return redirect()->back()->withErrors([
                 'error' => 'Failed to export data. Please try again.'
             ]);
         }

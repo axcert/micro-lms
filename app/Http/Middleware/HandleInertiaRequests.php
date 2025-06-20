@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Illuminate\Support\Facades\Log;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -25,15 +26,16 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        \Log::info('=== MIDDLEWARE DEBUG ===', [
-        'request_user' => $request->user() ? $request->user()->email : 'NULL',
-        'auth_check' => auth()->check(),
-        'auth_user' => auth()->user() ? auth()->user()->email : 'NULL',
-        'session_id' => session()->getId(),
-        'url' => $request->url()
-    ]);
-    
-        return array_merge(parent::share($request), [
+        // Debug logging
+        Log::info('HandleInertiaRequests::share called', [
+            'url' => $request->url(),
+            'user_exists' => $request->user() ? true : false,
+            'user_id' => $request->user()?->id,
+            'user_email' => $request->user()?->email,
+            'auth_check' => auth()->check(),
+        ]);
+
+        $sharedData = array_merge(parent::share($request), [
             'auth' => [
                 'user' => $request->user() ? [
                     'id' => $request->user()->id,
@@ -51,8 +53,20 @@ class HandleInertiaRequests extends Middleware
                 'error' => $request->session()->get('error'),
                 'warning' => $request->session()->get('warning'),
                 'info' => $request->session()->get('info'),
+                // Also support the format your controller uses
+                'type' => $request->session()->get('flash.type'),
+                'message' => $request->session()->get('flash.message'),
             ],
             'csrf_token' => csrf_token(),
         ]);
+
+        // Debug the shared data
+        Log::info('HandleInertiaRequests::share result', [
+            'has_auth' => isset($sharedData['auth']),
+            'has_user' => isset($sharedData['auth']['user']),
+            'shared_keys' => array_keys($sharedData),
+        ]);
+
+        return $sharedData;
     }
 }

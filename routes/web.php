@@ -27,14 +27,6 @@ Route::get('/', function () {
         'canRegister' => Route::has('register'),
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
-        'auth' => [
-            'user' => auth()->check() ? [
-                'id' => auth()->user()->id,
-                'name' => auth()->user()->name,
-                'email' => auth()->user()->email,
-                'role' => auth()->user()->role,
-            ] : null,
-        ],
     ]);
 });
 
@@ -91,6 +83,9 @@ Route::middleware('auth')->group(function () {
         // Dashboard
         Route::get('/dashboard', [TeacherDashboardController::class, 'index'])->name('dashboard');
         
+        // FIXED: Batch Export Route (must come BEFORE resource routes)
+        Route::get('batches/export', [BatchController::class, 'export'])->name('batches.export');
+        
         // Batch Management - Full CRUD Resource Routes
         Route::resource('batches', BatchController::class);
         
@@ -102,9 +97,8 @@ Route::middleware('auth')->group(function () {
         // Batch Actions
         Route::patch('batches/{batch}/toggle-status', [BatchController::class, 'toggleStatus'])->name('batches.toggle-status');
         Route::post('batches/{batch}/duplicate', [BatchController::class, 'duplicate'])->name('batches.duplicate');
-        Route::get('batches/{batch}/export', [BatchController::class, 'export'])->name('batches.export');
         
-        // Class Management Routes - NEW
+        // Class Management Routes
         Route::prefix('classes')->name('classes.')->group(function () {
             Route::get('/', [ClassController::class, 'index'])->name('index');
             Route::get('/create', [ClassController::class, 'create'])->name('create');
@@ -120,8 +114,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/{id}/cancel', [ClassController::class, 'cancel'])->name('cancel');
         });
         
-        // Existing routes updated to use ClassController
-        Route::get('/classes-old', [TeacherDashboardController::class, 'classes'])->name('classes-old.index');
+        // Other Teacher Routes
         Route::get('/quizzes', [TeacherDashboardController::class, 'quizzes'])->name('quizzes.index');
         Route::get('/reports', [TeacherDashboardController::class, 'reports'])->name('reports');
         
@@ -140,7 +133,7 @@ Route::middleware('auth')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| API Routes for AJAX calls - NEW
+| API Routes for AJAX calls
 |--------------------------------------------------------------------------
 */
 
@@ -194,14 +187,7 @@ if (app()->environment(['local', 'development'])) {
             return response()->json(['message' => 'Student access granted']);
         })->middleware(['auth', RoleMiddleware::class . ':student'])->name('student-only');
     });
-}
 
-/*
-|--------------------------------------------------------------------------
-| Debug Routes (REMOVE IN PRODUCTION)
-|--------------------------------------------------------------------------
-*/
-if (app()->environment(['local', 'development'])) {
     // Registration testing routes
     Route::get('/debug-registrations', function () {
         return response()->json([
@@ -230,14 +216,7 @@ if (app()->environment(['local', 'development'])) {
         ], 200, [], JSON_PRETTY_PRINT);
     });
 
-    // Simulate approval
-    Route::get('/debug-approve/{userId}', function ($userId) {
-        $user = \App\Models\User::findOrFail($userId);
-        $user->approve();
-        return response()->json(['message' => "User {$user->name} approved successfully"]);
-    });
-
-    // Add these temporary debug routes
+    // Debug routes
     Route::get('/debug-auth', function () {
         return response()->json([
             'authenticated' => auth()->check(),
@@ -272,14 +251,6 @@ Route::fallback(function () {
             'status' => 404,
             'message' => 'Page Not Found',
             'description' => 'The page you are looking for could not be found.',
-            'auth' => [
-                'user' => auth()->check() ? [
-                    'id' => auth()->user()->id,
-                    'name' => auth()->user()->name,
-                    'email' => auth()->user()->email,
-                    'role' => auth()->user()->role,
-                ] : null,
-            ],
         ]);
     }
     

@@ -1,668 +1,722 @@
-import React, { useState } from 'react';
-import { 
-  ArrowLeft, 
-  Video, 
-  Calendar, 
-  Clock, 
-  Users,
-  Edit,
-  Play,
-  CheckCircle,
-  XCircle,
-  RefreshCw,
-  Download,
-  UserCheck,
-  UserX,
-  ExternalLink,
-  BookOpen,
-  Bell,
-  Settings,
-  MapPin,
-  FileText,
-  AlertCircle
-} from 'lucide-react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Head, router, usePage } from '@inertiajs/react';
+import TeacherLayout from '@/Layouts/TeacherLayout';
+import {
+    ArrowLeftIcon,
+    VideoIcon,
+    CalendarIcon,
+    ClockIcon,
+    UsersIcon,
+    PlayIcon,
+    CheckCircleIcon,
+    XCircleIcon,
+    RefreshCwIcon,
+    DownloadIcon,
+    UserCheckIcon,
+    UserXIcon,
+    ExternalLinkIcon,
+    FileTextIcon,
+    AlertCircleIcon,
+    EditIcon,
+    EyeIcon,
+    UserIcon,
+    GlobeAltIcon,
+    LockClosedIcon,
+    SettingsIcon
+} from '@/Components/UI/Icons';
 
 interface Student {
-  id: number;
-  name: string;
-  email: string;
+    id: number;
+    name: string;
+    email: string;
 }
 
 interface Attendance {
-  id: number;
-  student_id: number;
-  status: 'present' | 'absent' | 'late';
-  marked_at: string | null;
-  student: Student;
+    id: number;
+    student_id: number;
+    status: 'present' | 'absent' | 'late';
+    marked_at: string | null;
+    student: Student;
 }
 
 interface Batch {
-  id: number;
-  name: string;
-  student_count: number;
+    id: number;
+    name: string;
+    student_count?: number;
+    description?: string;
 }
 
 interface Teacher {
-  id: number;
-  name: string;
-  email: string;
+    id: number;
+    name: string;
+    email: string;
 }
 
 interface ClassDetail {
-  id: number;
-  title: string;
-  description: string;
-  scheduled_at: string;
-  duration_minutes: number;
-  status: 'scheduled' | 'live' | 'completed' | 'cancelled' | 'rescheduled';
-  zoom_meeting_id: string | null;
-  zoom_join_url: string | null;
-  zoom_start_url: string | null;
-  zoom_password: string | null;
-  recording_url: string | null;
-  notes: string | null;
-  max_attendees: number | null;
-  batch: Batch;
-  teacher: Teacher;
-  attendances: Attendance[];
-  can_start: boolean;
-  is_upcoming: boolean;
-  is_completed: boolean;
-  formatted_duration: string;
+    id: number;
+    title: string;
+    description: string;
+    scheduled_at: string;
+    duration_minutes: number;
+    status: 'scheduled' | 'live' | 'completed' | 'cancelled' | 'rescheduled';
+    zoom_meeting_id?: string | null;
+    zoom_join_url?: string | null;
+    zoom_start_url?: string | null;
+    zoom_password?: string | null;
+    recording_url?: string | null;
+    notes?: string | null;
+    max_attendees?: number | null;
+    batch: Batch;
+    teacher?: Teacher;
+    attendances?: Attendance[];
+    can_start?: boolean;
+    is_upcoming?: boolean;
+    is_completed?: boolean;
+    formatted_duration?: string;
+    created_at?: string;
+    updated_at?: string;
 }
 
 interface AttendanceStats {
-  total_students: number;
-  present_count: number;
-  absent_count: number;
-  attendance_rate: number;
+    total_students: number;
+    present_count: number;
+    absent_count: number;
+    late_count: number;
+    attendance_rate: number;
 }
 
-export default function ClassShow() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'details'>('overview');
-  const [attendanceData, setAttendanceData] = useState<Record<number, 'present' | 'absent' | 'late'>>({});
+interface PageProps {
+    classData?: ClassDetail;
+    students?: Student[];
+    attendanceStats?: AttendanceStats;
+    auth: {
+        user: {
+            id: number;
+            name: string;
+            email: string;
+            role: string;
+        };
+    };
+    flash?: {
+        success?: string;
+        error?: string;
+    };
+}
 
-  // Mock data
-  const mockClass: ClassDetail = {
-    id: 1,
-    title: "Quadratic Equations - Advanced Problems",
-    description: "In this session, we'll dive deep into solving complex quadratic equations and explore real-world applications. Students will learn advanced techniques and problem-solving strategies.",
-    scheduled_at: "2024-06-05T10:00:00Z",
-    duration_minutes: 90,
-    status: "scheduled",
-    zoom_meeting_id: "123456789",
-    zoom_join_url: "https://zoom.us/j/123456789?pwd=abc123",
-    zoom_start_url: "https://zoom.us/s/123456789?zak=xyz789",
-    zoom_password: "123456",
-    recording_url: null,
-    notes: "Please bring calculators and notebooks. We'll be working through practice problems from chapter 5.",
-    max_attendees: 50,
-    batch: {
-      id: 1,
-      name: "Mathematics Grade 10 - Morning",
-      student_count: 28
-    },
-    teacher: {
-      id: 1,
-      name: "John Doe",
-      email: "john.doe@school.com"
-    },
-    attendances: [
-      {
-        id: 1,
-        student_id: 1,
-        status: "present",
-        marked_at: "2024-06-05T10:05:00Z",
-        student: { id: 1, name: "Alice Johnson", email: "alice@example.com" }
-      },
-      {
-        id: 2,
-        student_id: 2,
-        status: "absent",
-        marked_at: null,
-        student: { id: 2, name: "Bob Smith", email: "bob@example.com" }
-      },
-      {
-        id: 3,
-        student_id: 3,
-        status: "late",
-        marked_at: "2024-06-05T10:15:00Z",
-        student: { id: 3, name: "Carol Davis", email: "carol@example.com" }
-      },
-      {
-        id: 4,
-        student_id: 4,
-        status: "present",
-        marked_at: "2024-06-05T10:02:00Z",
-        student: { id: 4, name: "David Wilson", email: "david@example.com" }
-      }
-    ],
-    can_start: true,
-    is_upcoming: true,
-    is_completed: false,
-    formatted_duration: "1h 30m"
-  };
+const ShowClass: React.FC = () => {
+    const { props } = usePage<PageProps>();
+    const { classData, students = [], attendanceStats, auth, flash } = props;
 
-  const attendanceStats: AttendanceStats = {
-    total_students: 28,
-    present_count: 2,
-    absent_count: 1,
-    attendance_rate: 71.4
-  };
+    const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'details'>('overview');
+    const [attendanceData, setAttendanceData] = useState<Record<number, 'present' | 'absent' | 'late'>>({});
+    const [isLoading, setIsLoading] = useState(false);
 
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+    // Memoized calculations to improve performance
+    const defaultAttendanceStats = useMemo<AttendanceStats>(() => ({
+        total_students: students.length,
+        present_count: 0,
+        absent_count: students.length,
+        late_count: 0,
+        attendance_rate: 0
+    }), [students.length]);
 
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+    const finalAttendanceStats = attendanceStats || defaultAttendanceStats;
 
-  const getStatusInfo = (status: string) => {
-    switch (status) {
-      case 'scheduled':
-        return { icon: Clock, color: 'text-blue-600 bg-blue-100', text: 'Scheduled' };
-      case 'live':
-        return { icon: Play, color: 'text-red-600 bg-red-100', text: 'Live Now' };
-      case 'completed':
-        return { icon: CheckCircle, color: 'text-green-600 bg-green-100', text: 'Completed' };
-      case 'cancelled':
-        return { icon: XCircle, color: 'text-gray-600 bg-gray-100', text: 'Cancelled' };
-      case 'rescheduled':
-        return { icon: RefreshCw, color: 'text-yellow-600 bg-yellow-100', text: 'Rescheduled' };
-      default:
-        return { icon: Clock, color: 'text-gray-600 bg-gray-100', text: status };
-    }
-  };
+    const statusInfo = useMemo(() => {
+        const getStatusInfo = (status: string) => {
+            switch (status) {
+                case 'scheduled':
+                    return { 
+                        icon: CalendarIcon, 
+                        color: 'text-blue-600 bg-blue-100 border-blue-200', 
+                        text: 'Scheduled', 
+                        badgeColor: 'bg-blue-500' 
+                    };
+                case 'live':
+                    return { 
+                        icon: PlayIcon, 
+                        color: 'text-red-600 bg-red-100 border-red-200', 
+                        text: 'Live Now', 
+                        badgeColor: 'bg-red-500 animate-pulse' 
+                    };
+                case 'completed':
+                    return { 
+                        icon: CheckCircleIcon, 
+                        color: 'text-green-600 bg-green-100 border-green-200', 
+                        text: 'Completed', 
+                        badgeColor: 'bg-green-500' 
+                    };
+                case 'cancelled':
+                    return { 
+                        icon: XCircleIcon, 
+                        color: 'text-gray-600 bg-gray-100 border-gray-200', 
+                        text: 'Cancelled', 
+                        badgeColor: 'bg-gray-500' 
+                    };
+                case 'rescheduled':
+                    return { 
+                        icon: RefreshCwIcon, 
+                        color: 'text-yellow-600 bg-yellow-100 border-yellow-200', 
+                        text: 'Rescheduled', 
+                        badgeColor: 'bg-yellow-500' 
+                    };
+                default:
+                    return { 
+                        icon: ClockIcon, 
+                        color: 'text-gray-600 bg-gray-100 border-gray-200', 
+                        text: status, 
+                        badgeColor: 'bg-gray-500' 
+                    };
+            }
+        };
 
-  const getAttendanceStatusColor = (status: string) => {
-    switch (status) {
-      case 'present':
-        return 'bg-green-100 text-green-800';
-      case 'late':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'absent':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+        return getStatusInfo(classData?.status || 'scheduled');
+    }, [classData?.status]);
 
-  const handleAttendanceChange = (studentId: number, status: 'present' | 'absent' | 'late') => {
-    setAttendanceData(prev => ({
-      ...prev,
-      [studentId]: status
-    }));
-  };
+    // Memoized date formatting functions
+    const formatDateTime = useCallback((dateString: string) => {
+        return new Date(dateString).toLocaleString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    }, []);
 
-  const statusInfo = getStatusInfo(mockClass.status);
-  const StatusIcon = statusInfo.icon;
+    const formatTime = useCallback((dateString: string) => {
+        return new Date(dateString).toLocaleString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    }, []);
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 flex items-center">
-                <div className="h-8 w-8 bg-purple-600 rounded-lg flex items-center justify-center">
-                  <BookOpen className="h-5 w-5 text-white" />
+    // Optimized attendance change handler
+    const handleAttendanceChange = useCallback((studentId: number, status: 'present' | 'absent' | 'late') => {
+        setAttendanceData(prev => ({
+            ...prev,
+            [studentId]: status
+        }));
+    }, []);
+
+    // Navigation handlers
+    const handleBackToClasses = useCallback(() => {
+        router.visit('/teacher/classes');
+    }, []);
+
+    const handleEditClass = useCallback(() => {
+        if (classData?.id) {
+            router.visit(`/teacher/classes/${classData.id}/edit`);
+        }
+    }, [classData?.id]);
+
+    const handleStartClass = useCallback(() => {
+        if (classData?.zoom_start_url) {
+            window.open(classData.zoom_start_url, '_blank');
+        }
+    }, [classData?.zoom_start_url]);
+
+    const handleJoinClass = useCallback(() => {
+        if (classData?.zoom_join_url) {
+            window.open(classData.zoom_join_url, '_blank');
+        }
+    }, [classData?.zoom_join_url]);
+
+    const handleMarkCompleted = useCallback(() => {
+        if (classData?.id) {
+            setIsLoading(true);
+            router.put(`/teacher/classes/${classData.id}/complete`, {}, {
+                onFinish: () => setIsLoading(false)
+            });
+        }
+    }, [classData?.id]);
+
+    const handleCancelClass = useCallback(() => {
+        if (classData?.id) {
+            setIsLoading(true);
+            router.put(`/teacher/classes/${classData.id}/cancel`, {}, {
+                onFinish: () => setIsLoading(false)
+            });
+        }
+    }, [classData?.id]);
+
+    // Show loading state if classData is not available
+    if (!classData) {
+        return (
+            <TeacherLayout 
+                user={auth.user} 
+                title="Loading..."
+                currentPage="classes"
+                pageDescription="Loading class data..."
+            >
+                <Head title="Loading Class Details" />
+                <div className="max-w-7xl mx-auto">
+                    <div className="bg-white shadow-2xl rounded-3xl border border-gray-100 overflow-hidden">
+                        <div className="p-8 text-center">
+                            <div className="animate-spin inline-block w-8 h-8 border-4 border-current border-t-transparent text-green-600 rounded-full" role="status">
+                                <span className="sr-only">Loading...</span>
+                            </div>
+                            <p className="mt-4 text-gray-600">Loading class data...</p>
+                        </div>
+                    </div>
                 </div>
-                <span className="ml-2 text-xl font-semibold text-gray-900">MicroLMS</span>
-              </div>
+            </TeacherLayout>
+        );
+    }
+
+    const StatusIcon = statusInfo.icon;
+
+    const headerContent = (
+        <div className="flex items-center justify-between w-full">
+            <div className="flex items-center space-x-3">
+                <button
+                    onClick={handleBackToClasses}
+                    className="bg-white hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow-md flex items-center"
+                >
+                    <ArrowLeftIcon className="h-4 w-4 mr-2" />
+                    Back to Classes
+                </button>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-400 hover:text-gray-500">
-                <Bell className="h-5 w-5" />
-              </button>
-              <button className="p-2 text-gray-400 hover:text-gray-500">
-                <Settings className="h-5 w-5" />
-              </button>
-              <div className="flex items-center space-x-2">
-                <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-purple-600">JD</span>
-                </div>
-                <span className="text-sm font-medium text-gray-700">John Doe</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Sidebar */}
-      <div className="flex">
-        <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 md:pt-16">
-          <div className="flex-1 flex flex-col min-h-0 bg-white border-r border-gray-200">
-            <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
-              <nav className="mt-5 flex-1 px-2 space-y-1">
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                  <BookOpen className="text-gray-400 mr-3 h-5 w-5" />
-                  Batches
-                </a>
-                <a href="#" className="bg-purple-100 text-purple-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                  <Video className="text-purple-500 mr-3 h-5 w-5" />
-                  Classes
-                </a>
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                  <BookOpen className="text-gray-400 mr-3 h-5 w-5" />
-                  Quizzes
-                </a>
-                <a href="#" className="text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-2 py-2 text-sm font-medium rounded-md">
-                  <Users className="text-gray-400 mr-3 h-5 w-5" />
-                  Students
-                </a>
-              </nav>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="md:pl-64 flex flex-col flex-1">
-          <main className="flex-1">
-            <div className="py-6">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
-                <div className="mb-6">
-                  <div className="flex items-center space-x-3 mb-4">
+            <div className="flex items-center space-x-3">
+                {classData.can_start && classData.zoom_start_url && (
                     <button
-                      type="button"
-                      className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-1" />
-                      Back to Classes
-                    </button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-3">
-                        <h1 className="text-2xl font-bold text-gray-900 truncate">{mockClass.title}</h1>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}>
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {statusInfo.text}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-sm text-gray-500 truncate">
-                        {mockClass.batch.name} • {formatDateTime(mockClass.scheduled_at)}
-                      </p>
-                    </div>
-                    
-                    <div className="flex space-x-3">
-                      {mockClass.can_start && mockClass.zoom_start_url && (
-                        <button
-                          type="button"
-                          className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                        >
-                          <Play className="h-4 w-4 mr-2" />
-                          Start Class
-                        </button>
-                      )}
-                      
-                      {mockClass.zoom_join_url && (
-                        <button
-                          type="button"
-                          className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          Join Class
-                        </button>
-                      )}
-                      
-                      <button
                         type="button"
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Class
-                      </button>
+                        onClick={handleStartClass}
+                        disabled={isLoading}
+                        className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-6 py-2 rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center disabled:opacity-50"
+                    >
+                        <PlayIcon className="h-4 w-4 mr-2" />
+                        Start Class
+                    </button>
+                )}
+                
+                {classData.zoom_join_url && (
+                    <button
+                        type="button"
+                        onClick={handleJoinClass}
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center"
+                    >
+                        <ExternalLinkIcon className="h-4 w-4 mr-2" />
+                        Join Class
+                    </button>
+                )}
+                
+                <button
+                    type="button"
+                    onClick={handleEditClass}
+                    className="bg-white hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-200 shadow-sm hover:shadow-md flex items-center"
+                >
+                    <EditIcon className="h-4 w-4 mr-2" />
+                    Edit Class
+                </button>
+            </div>
+        </div>
+    );
+
+    return (
+        <TeacherLayout 
+            user={auth.user} 
+            title={classData.title}
+            currentPage="classes"
+            headerContent={headerContent}
+            pageDescription={`${classData.batch.name} • ${formatDateTime(classData.scheduled_at)}`}
+        >
+            <Head title={`${classData.title} - Class Details`} />
+            
+            <div className="max-w-7xl mx-auto">
+                {/* Flash Messages */}
+                {flash?.success && (
+                    <div className="mb-6 rounded-2xl bg-green-50 p-6 border border-green-200">
+                        <div className="flex">
+                            <CheckCircleIcon className="h-6 w-6 text-green-400 mt-0.5" />
+                            <div className="ml-3">
+                                <p className="text-green-800 font-medium">{flash.success}</p>
+                            </div>
+                        </div>
                     </div>
-                  </div>
+                )}
+
+                {flash?.error && (
+                    <div className="mb-6 rounded-2xl bg-red-50 p-6 border border-red-200">
+                        <div className="flex">
+                            <AlertCircleIcon className="h-6 w-6 text-red-400 mt-0.5" />
+                            <div className="ml-3">
+                                <p className="text-red-800 font-medium">{flash.error}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Header Section */}
+                <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden mb-8">
+                    <div className="bg-gradient-to-r from-green-500 to-green-600 px-8 py-6">
+                        <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center space-x-4 mb-2">
+                                    <h1 className="text-2xl font-bold text-white truncate">{classData.title}</h1>
+                                    <div className={`px-4 py-2 rounded-xl border ${statusInfo.color} bg-white flex items-center`}>
+                                        <div className={`w-2 h-2 rounded-full ${statusInfo.badgeColor} mr-2`}></div>
+                                        <StatusIcon className="h-4 w-4 mr-2" />
+                                        <span className="font-semibold">{statusInfo.text}</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center text-green-100 space-x-6">
+                                    <div className="flex items-center">
+                                        <UsersIcon className="h-4 w-4 mr-2" />
+                                        <span>{classData.batch.name}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <CalendarIcon className="h-4 w-4 mr-2" />
+                                        <span>{formatDateTime(classData.scheduled_at)}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <ClockIcon className="h-4 w-4 mr-2" />
+                                        <span>{classData.formatted_duration || `${classData.duration_minutes} minutes`}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="ml-6">
+                                <span className="text-green-100 text-sm font-medium">Class ID: #{classData.id}</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <Users className="h-8 w-8 text-purple-600" />
-                      </div>
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-500">Total Students</p>
-                        <p className="text-2xl font-semibold text-gray-900">
-                          {attendanceStats.total_students}
-                        </p>
-                      </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="h-12 w-12 bg-purple-100 rounded-2xl flex items-center justify-center">
+                                    <UsersIcon className="h-6 w-6 text-purple-600" />
+                                </div>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Total Students</p>
+                                <p className="text-3xl font-bold text-gray-900">
+                                    {finalAttendanceStats.total_students}
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                  </div>
 
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <UserCheck className="h-8 w-8 text-green-600" />
-                      </div>
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-500">Present</p>
-                        <p className="text-2xl font-semibold text-gray-900">
-                          {attendanceStats.present_count}
-                        </p>
-                      </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="h-12 w-12 bg-green-100 rounded-2xl flex items-center justify-center">
+                                    <UserCheckIcon className="h-6 w-6 text-green-600" />
+                                </div>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Present</p>
+                                <p className="text-3xl font-bold text-gray-900">
+                                    {finalAttendanceStats.present_count}
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                  </div>
 
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <UserX className="h-8 w-8 text-red-600" />
-                      </div>
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-500">Absent</p>
-                        <p className="text-2xl font-semibold text-gray-900">
-                          {attendanceStats.absent_count}
-                        </p>
-                      </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="h-12 w-12 bg-red-100 rounded-2xl flex items-center justify-center">
+                                    <UserXIcon className="h-6 w-6 text-red-600" />
+                                </div>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Absent</p>
+                                <p className="text-3xl font-bold text-gray-900">
+                                    {finalAttendanceStats.absent_count}
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                  </div>
 
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <CheckCircle className="h-8 w-8 text-blue-600" />
-                      </div>
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-500">Attendance Rate</p>
-                        <p className="text-2xl font-semibold text-gray-900">
-                          {attendanceStats.attendance_rate}%
-                        </p>
-                      </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="h-12 w-12 bg-blue-100 rounded-2xl flex items-center justify-center">
+                                    <CheckCircleIcon className="h-6 w-6 text-blue-600" />
+                                </div>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Attendance Rate</p>
+                                <p className="text-3xl font-bold text-gray-900">
+                                    {finalAttendanceStats.attendance_rate}%
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                  </div>
                 </div>
 
                 {/* Tabs */}
-                <div className="border-b border-gray-200">
-                  <nav className="-mb-px flex space-x-8">
-                    <button
-                      onClick={() => setActiveTab('overview')}
-                      className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                        activeTab === 'overview'
-                          ? 'border-purple-500 text-purple-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      Overview
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('attendance')}
-                      className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                        activeTab === 'attendance'
-                          ? 'border-purple-500 text-purple-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      Attendance ({mockClass.attendances.length})
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('details')}
-                      className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                        activeTab === 'details'
-                          ? 'border-purple-500 text-purple-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      Class Details
-                    </button>
-                  </nav>
-                </div>
-
-                {/* Tab Content */}
-                <div className="mt-6">
-                  {activeTab === 'overview' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Class Information */}
-                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Class Information</h3>
-                        <dl className="space-y-4">
-                          <div>
-                            <dt className="text-sm font-medium text-gray-500">Description</dt>
-                            <dd className="text-sm text-gray-900 mt-1">{mockClass.description}</dd>
-                          </div>
-                          <div>
-                            <dt className="text-sm font-medium text-gray-500">Duration</dt>
-                            <dd className="text-sm text-gray-900">{mockClass.formatted_duration}</dd>
-                          </div>
-                          <div>
-                            <dt className="text-sm font-medium text-gray-500">Batch</dt>
-                            <dd className="text-sm text-gray-900">{mockClass.batch.name}</dd>
-                          </div>
-                          {mockClass.notes && (
-                            <div>
-                              <dt className="text-sm font-medium text-gray-500">Notes</dt>
-                              <dd className="text-sm text-gray-900">{mockClass.notes}</dd>
-                            </div>
-                          )}
-                        </dl>
-                      </div>
-
-                      {/* Zoom Meeting Info */}
-                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Meeting Information</h3>
-                        {mockClass.zoom_meeting_id ? (
-                          <dl className="space-y-4">
-                            <div>
-                              <dt className="text-sm font-medium text-gray-500">Meeting ID</dt>
-                              <dd className="text-sm text-gray-900 font-mono">{mockClass.zoom_meeting_id}</dd>
-                            </div>
-                            {mockClass.zoom_password && (
-                              <div>
-                                <dt className="text-sm font-medium text-gray-500">Password</dt>
-                                <dd className="text-sm text-gray-900 font-mono">{mockClass.zoom_password}</dd>
-                              </div>
-                            )}
-                            <div>
-                              <dt className="text-sm font-medium text-gray-500">Join URL</dt>
-                              <dd className="text-sm">
-                                <a 
-                                  href={mockClass.zoom_join_url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-500 break-all"
+                <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden">
+                    <div className="border-b border-gray-200">
+                        <nav className="flex space-x-8 px-8" role="tablist">
+                            {[
+                                { id: 'overview', label: 'Overview', icon: EyeIcon },
+                                { id: 'attendance', label: `Attendance (${students.length})`, icon: UserCheckIcon },
+                                { id: 'details', label: 'Class Details', icon: FileTextIcon }
+                            ].map(({ id, label, icon: Icon }) => (
+                                <button
+                                    key={id}
+                                    onClick={() => setActiveTab(id as any)}
+                                    className={`py-4 px-1 border-b-3 font-semibold text-sm transition-all duration-200 ${
+                                        activeTab === id
+                                            ? 'border-green-500 text-green-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    }`}
+                                    role="tab"
+                                    aria-selected={activeTab === id}
                                 >
-                                  {mockClass.zoom_join_url}
-                                </a>
-                              </dd>
-                            </div>
-                            {mockClass.max_attendees && (
-                              <div>
-                                <dt className="text-sm font-medium text-gray-500">Max Attendees</dt>
-                                <dd className="text-sm text-gray-900">{mockClass.max_attendees}</dd>
-                              </div>
-                            )}
-                          </dl>
-                        ) : (
-                          <p className="text-sm text-gray-500">No Zoom meeting configured for this class.</p>
-                        )}
-                      </div>
+                                    <Icon className="w-4 h-4 mr-2 inline" />
+                                    {label}
+                                </button>
+                            ))}
+                        </nav>
                     </div>
-                  )}
 
-                  {activeTab === 'attendance' && (
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                      <div className="px-6 py-4 border-b border-gray-200">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-medium text-gray-900">
-                            Student Attendance
-                          </h3>
-                          <div className="flex space-x-3">
-                            <button
-                              type="button"
-                              className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                            >
-                              <Download className="h-4 w-4 mr-1" />
-                              Export
-                            </button>
-                            <button
-                              type="button"
-                              className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                            >
-                              Save Changes
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="divide-y divide-gray-200">
-                        {mockClass.attendances.map((attendance) => (
-                          <div key={attendance.id} className="px-6 py-4 flex items-center justify-between">
-                            <div className="flex items-center">
-                              <div className="flex-shrink-0 h-10 w-10">
-                                <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
-                                  <span className="text-sm font-medium text-purple-600">
-                                    {attendance.student.name.charAt(0).toUpperCase()}
-                                  </span>
+                    {/* Tab Content */}
+                    <div className="p-8">
+                        {activeTab === 'overview' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                {/* Class Information */}
+                                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
+                                    <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                                        <FileTextIcon className="h-6 w-6 mr-3 text-green-600" />
+                                        Class Information
+                                    </h3>
+                                    <div className="space-y-6">
+                                        <div>
+                                            <dt className="text-sm font-semibold text-gray-500 mb-2">Description</dt>
+                                            <dd className="text-gray-900 leading-relaxed">{classData.description || 'No description provided.'}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-sm font-semibold text-gray-500 mb-2">Duration</dt>
+                                            <dd className="text-gray-900">{classData.formatted_duration || `${classData.duration_minutes} minutes`}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-sm font-semibold text-gray-500 mb-2">Batch</dt>
+                                            <dd className="text-gray-900">{classData.batch.name}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-sm font-semibold text-gray-500 mb-2">Teacher</dt>
+                                            <dd className="text-gray-900 flex items-center">
+                                                <UserIcon className="h-4 w-4 mr-2 text-gray-400" />
+                                                {classData.teacher?.name || auth.user.name}
+                                            </dd>
+                                        </div>
+                                        {classData.notes && (
+                                            <div>
+                                                <dt className="text-sm font-semibold text-gray-500 mb-2">Notes</dt>
+                                                <dd className="text-gray-900 leading-relaxed bg-white p-4 rounded-xl border border-gray-200">{classData.notes}</dd>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                              </div>
-                              <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-900">{attendance.student.name}</p>
-                                <p className="text-sm text-gray-500">{attendance.student.email}</p>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center space-x-4">
-                              {attendance.marked_at && (
-                                <span className="text-xs text-gray-500">
-                                  Marked at {formatTime(attendance.marked_at)}
-                                </span>
-                              )}
-                              
-                              <div className="flex space-x-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleAttendanceChange(attendance.student_id, 'present')}
-                                  className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                                    attendance.status === 'present'
-                                      ? 'bg-green-100 text-green-800'
-                                      : 'bg-gray-100 text-gray-600 hover:bg-green-50'
-                                  }`}
-                                >
-                                  Present
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAttendanceChange(attendance.student_id, 'late')}
-                                  className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                                    attendance.status === 'late'
-                                      ? 'bg-yellow-100 text-yellow-800'
-                                      : 'bg-gray-100 text-gray-600 hover:bg-yellow-50'
-                                  }`}
-                                >
-                                  Late
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAttendanceChange(attendance.student_id, 'absent')}
-                                  className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                                    attendance.status === 'absent'
-                                      ? 'bg-red-100 text-red-800'
-                                      : 'bg-gray-100 text-gray-600 hover:bg-red-50'
-                                  }`}
-                                >
-                                  Absent
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
-                  {activeTab === 'details' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Technical Details</h3>
-                        <dl className="space-y-4">
-                          <div>
-                            <dt className="text-sm font-medium text-gray-500">Class ID</dt>
-                            <dd className="text-sm text-gray-900 font-mono">#{mockClass.id}</dd>
-                          </div>
-                          <div>
-                            <dt className="text-sm font-medium text-gray-500">Created At</dt>
-                            <dd className="text-sm text-gray-900">June 1, 2024 at 2:30 PM</dd>
-                          </div>
-                          <div>
-                            <dt className="text-sm font-medium text-gray-500">Last Updated</dt>
-                            <dd className="text-sm text-gray-900">June 3, 2024 at 4:15 PM</dd>
-                          </div>
-                          {mockClass.recording_url && (
+                                {/* Meeting Information */}
+                                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
+                                    <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                                        <VideoIcon className="h-6 w-6 mr-3 text-green-600" />
+                                        Meeting Information
+                                    </h3>
+                                    {classData.zoom_meeting_id ? (
+                                        <div className="space-y-6">
+                                            <div>
+                                                <dt className="text-sm font-semibold text-gray-500 mb-2">Meeting ID</dt>
+                                                <dd className="text-gray-900 font-mono bg-white px-4 py-2 rounded-xl border border-gray-200">{classData.zoom_meeting_id}</dd>
+                                            </div>
+                                            {classData.zoom_password && (
+                                                <div>
+                                                    <dt className="text-sm font-semibold text-gray-500 mb-2 flex items-center">
+                                                        <LockClosedIcon className="h-4 w-4 mr-2" />
+                                                        Password
+                                                    </dt>
+                                                    <dd className="text-gray-900 font-mono bg-white px-4 py-2 rounded-xl border border-gray-200">{classData.zoom_password}</dd>
+                                                </div>
+                                            )}
+                                            <div>
+                                                <dt className="text-sm font-semibold text-gray-500 mb-2 flex items-center">
+                                                    <GlobeAltIcon className="h-4 w-4 mr-2" />
+                                                    Join URL
+                                                </dt>
+                                                <dd className="text-sm">
+                                                    <a 
+                                                        href={classData.zoom_join_url} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-600 hover:text-blue-500 break-all bg-white p-4 rounded-xl border border-gray-200 block hover:border-blue-300 transition-colors duration-200"
+                                                    >
+                                                        {classData.zoom_join_url}
+                                                    </a>
+                                                </dd>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-8">
+                                            <VideoIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                                            <p className="text-gray-500">No Zoom meeting configured for this class.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'attendance' && (
                             <div>
-                              <dt className="text-sm font-medium text-gray-500">Recording</dt>
-                              <dd className="text-sm">
-                                <a 
-                                  href={mockClass.recording_url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-500"
-                                >
-                                  View Recording
-                                </a>
-                              </dd>
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-xl font-bold text-gray-900 flex items-center">
+                                        <UserCheckIcon className="h-6 w-6 mr-3 text-green-600" />
+                                        Student Attendance
+                                    </h3>
+                                    <div className="flex space-x-3">
+                                        <button
+                                            type="button"
+                                            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200"
+                                        >
+                                            <DownloadIcon className="h-4 w-4 mr-2" />
+                                            Export
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={isLoading}
+                                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl text-white bg-green-600 hover:bg-green-700 transition-colors duration-200 disabled:opacity-50"
+                                        >
+                                            {isLoading ? 'Saving...' : 'Save Changes'}
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                {students.length > 0 ? (
+                                    <div className="grid gap-4">
+                                        {students.map((student) => (
+                                            <div key={student.id} className="bg-gray-50 rounded-2xl p-6 flex items-center justify-between">
+                                                <div className="flex items-center">
+                                                    <div className="flex-shrink-0 h-12 w-12">
+                                                        <div className="h-12 w-12 rounded-2xl bg-green-100 flex items-center justify-center">
+                                                            <span className="text-lg font-semibold text-green-600">
+                                                                {student.name.charAt(0).toUpperCase()}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="ml-4">
+                                                        <p className="text-lg font-semibold text-gray-900">{student.name}</p>
+                                                        <p className="text-sm text-gray-500">{student.email}</p>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex space-x-2">
+                                                    {['present', 'late', 'absent'].map((status) => (
+                                                        <button
+                                                            key={status}
+                                                            type="button"
+                                                            onClick={() => handleAttendanceChange(student.id, status as any)}
+                                                            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 border-2 ${
+                                                                attendanceData[student.id] === status
+                                                                    ? status === 'present' ? 'bg-green-100 border-green-300 text-green-700'
+                                                                    : status === 'late' ? 'bg-yellow-100 border-yellow-300 text-yellow-700'
+                                                                    : 'bg-red-100 border-red-300 text-red-700'
+                                                                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                                            }`}
+                                                        >
+                                                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8">
+                                        <UsersIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                                        <p className="text-gray-500">No students found in this batch.</p>
+                                    </div>
+                                )}
                             </div>
-                          )}
-                        </dl>
-                      </div>
+                        )}
 
-                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Actions</h3>
-                        <div className="space-y-3">
-                          {mockClass.status === 'scheduled' && (
-                            <button
-                              type="button"
-                              className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                            >
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Cancel Class
-                            </button>
-                          )}
-                          
-                          {mockClass.status === 'live' && (
-                            <button
-                              type="button"
-                              className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                            >
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Mark as Completed
-                            </button>
-                          )}
-                          
-                          <button
-                            type="button"
-                            className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                          >
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Reschedule Class
-                          </button>
-                        </div>
-                      </div>
+                        {activeTab === 'details' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
+                                    <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                                        <FileTextIcon className="h-6 w-6 mr-3 text-green-600" />
+                                        Technical Details
+                                    </h3>
+                                    <div className="space-y-6">
+                                        <div>
+                                            <dt className="text-sm font-semibold text-gray-500 mb-2">Class ID</dt>
+                                            <dd className="text-gray-900 font-mono bg-white px-4 py-2 rounded-xl border border-gray-200">#{classData.id}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-sm font-semibold text-gray-500 mb-2">Created At</dt>
+                                            <dd className="text-gray-900">{classData.created_at ? formatDateTime(classData.created_at) : 'N/A'}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-sm font-semibold text-gray-500 mb-2">Last Updated</dt>
+                                            <dd className="text-gray-900">{classData.updated_at ? formatDateTime(classData.updated_at) : 'N/A'}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-sm font-semibold text-gray-500 mb-2">Status</dt>
+                                            <dd>
+                                                <span className={`inline-flex items-center px-3 py-1 rounded-xl text-sm font-semibold border-2 ${statusInfo.color}`}>
+                                                    <StatusIcon className="h-4 w-4 mr-2" />
+                                                    {statusInfo.text}
+                                                </span>
+                                            </dd>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200">
+                                    <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                                        <SettingsIcon className="h-6 w-6 mr-3 text-green-600" />
+                                        Quick Actions
+                                    </h3>
+                                    <div className="space-y-4">
+                                        {classData.status === 'scheduled' && (
+                                            <button
+                                                type="button"
+                                                onClick={handleCancelClass}
+                                                disabled={isLoading}
+                                                className="w-full flex items-center justify-center px-6 py-3 border-2 border-red-200 rounded-2xl text-red-700 bg-red-50 hover:bg-red-100 font-semibold transition-all duration-200 disabled:opacity-50"
+                                            >
+                                                <XCircleIcon className="h-5 w-5 mr-3" />
+                                                {isLoading ? 'Processing...' : 'Cancel Class'}
+                                            </button>
+                                        )}
+                                        
+                                        {classData.status === 'live' && (
+                                            <button
+                                                type="button"
+                                                onClick={handleMarkCompleted}
+                                                disabled={isLoading}
+                                                className="w-full flex items-center justify-center px-6 py-3 border-2 border-green-200 rounded-2xl text-green-700 bg-green-50 hover:bg-green-100 font-semibold transition-all duration-200 disabled:opacity-50"
+                                            >
+                                                <CheckCircleIcon className="h-5 w-5 mr-3" />
+                                                {isLoading ? 'Processing...' : 'Mark as Completed'}
+                                            </button>
+                                        )}
+                                        
+                                        <button
+                                            type="button"
+                                            onClick={handleEditClass}
+                                            className="w-full flex items-center justify-center px-6 py-3 border-2 border-blue-200 rounded-2xl text-blue-700 bg-blue-50 hover:bg-blue-100 font-semibold transition-all duration-200"
+                                        >
+                                            <EditIcon className="h-5 w-5 mr-3" />
+                                            Edit Class Details
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                  )}
                 </div>
-              </div>
             </div>
-          </main>
-        </div>
-      </div>
-    </div>
-  );
-}
+        </TeacherLayout>
+    );
+};
+
+export default ShowClass;
