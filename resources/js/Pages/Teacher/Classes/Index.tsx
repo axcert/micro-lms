@@ -175,9 +175,105 @@ export default function ClassesIndex({
     router.visit('/teacher/classes/create');
   };
 
-  const handleViewClass = (classId: number) => {
-    router.visit(`/teacher/classes/${classId}`);
-  };
+  // Replace your handleViewClass function in ClassesIndex component with this:
+
+const handleViewClass = (classId: number) => {
+  console.log('=== DEBUG: handleViewClass called ===');
+  console.log('Class ID:', classId);
+  console.log('Type of classId:', typeof classId);
+  
+  // Validate classId
+  if (!classId || isNaN(classId) || classId <= 0) {
+    console.error('Invalid class ID:', classId);
+    alert(`Invalid class ID: ${classId}`);
+    return;
+  }
+  
+  const url = `/teacher/classes/${classId}`;
+  console.log('Target URL:', url);
+  console.log('Current location:', window.location.href);
+  
+  // Check if router is available
+  if (!router) {
+    console.error('Router not available');
+    alert('Navigation error: Router not available');
+    return;
+  }
+  
+  console.log('Using Inertia router to navigate...');
+  
+  try {
+    router.visit(url, {
+      method: 'get',
+      preserveState: false,
+      preserveScroll: false,
+      onStart: () => {
+        console.log('Navigation started');
+      },
+      onProgress: (progress) => {
+        console.log('Navigation progress:', progress);
+      },
+      onSuccess: (page) => {
+        console.log('Navigation successful:', page);
+      },
+      onError: (errors) => {
+        console.error('Navigation error:', errors);
+        console.error('Error details:', JSON.stringify(errors, null, 2));
+        
+        // Show user-friendly error
+        if (errors.general) {
+          alert(`Error: ${errors.general}`);
+        } else if (typeof errors === 'string') {
+          alert(`Error: ${errors}`);
+        } else {
+          alert(`Navigation failed. Please check console for details.`);
+        }
+      },
+      onFinish: () => {
+        console.log('Navigation finished');
+      }
+    });
+  } catch (error) {
+    console.error('Exception during navigation:', error);
+    alert(`Navigation exception: ${error.message}`);
+  }
+};
+
+// Alternative method for testing - add this temporarily
+const handleViewClassDirect = (classId: number) => {
+  console.log('=== DIRECT NAVIGATION TEST ===');
+  const url = `/teacher/classes/${classId}`;
+  console.log('Direct navigation to:', url);
+  
+  // Try direct window navigation as fallback
+  window.location.href = url;
+};
+
+// Test function to check routes - add this temporarily  
+const testRoutes = () => {
+  console.log('=== TESTING ROUTES ===');
+  
+  // Test if route exists by making a fetch request
+  fetch('/teacher/classes/1', {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(response => {
+    console.log('Route test response status:', response.status);
+    console.log('Route test response headers:', response.headers);
+    return response.text();
+  })
+  .then(data => {
+    console.log('Route test response data length:', data.length);
+    console.log('Route test response (first 200 chars):', data.substring(0, 200));
+  })
+  .catch(error => {
+    console.error('Route test error:', error);
+  });
+};
 
   const handleEditClass = (classId: number) => {
     router.visit(`/teacher/classes/${classId}/edit`);

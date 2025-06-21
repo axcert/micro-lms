@@ -7,7 +7,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Teacher\TeacherDashboardController;
 use App\Http\Controllers\Teacher\BatchController;
-use App\Http\Controllers\Teacher\ClassController; 
+use App\Http\Controllers\Teacher\ClassController;
+use App\Http\Controllers\Teacher\QuizController; // ADD THIS IMPORT
 use App\Http\Controllers\Student\StudentDashboardController;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Foundation\Application;
@@ -114,8 +115,28 @@ Route::middleware('auth')->group(function () {
             Route::post('/{id}/cancel', [ClassController::class, 'cancel'])->name('cancel');
         });
         
-        // Other Teacher Routes
-        Route::get('/quizzes', [TeacherDashboardController::class, 'quizzes'])->name('quizzes.index');
+        // FIXED: Quiz Management Routes - Using QuizController
+        Route::prefix('quizzes')->name('quizzes.')->group(function () {
+            // Export route must come before resource routes
+            Route::get('/export', [QuizController::class, 'export'])->name('export');
+            
+            // Main CRUD routes
+            Route::get('/', [QuizController::class, 'index'])->name('index');
+            Route::get('/create', [QuizController::class, 'create'])->name('create');
+            Route::post('/', [QuizController::class, 'store'])->name('store');
+            Route::get('/{quiz}', [QuizController::class, 'show'])->name('show');
+            Route::get('/{quiz}/edit', [QuizController::class, 'edit'])->name('edit');
+            Route::put('/{quiz}', [QuizController::class, 'update'])->name('update');
+            Route::delete('/{quiz}', [QuizController::class, 'destroy'])->name('destroy');
+            
+            // Quiz Actions
+            Route::post('/{quiz}/activate', [QuizController::class, 'activate'])->name('activate');
+            Route::post('/{quiz}/archive', [QuizController::class, 'archive'])->name('archive');
+            Route::post('/{quiz}/duplicate', [QuizController::class, 'duplicate'])->name('duplicate');
+            Route::get('/{quiz}/results', [QuizController::class, 'results'])->name('results');
+        });
+        
+        // Reports
         Route::get('/reports', [TeacherDashboardController::class, 'reports'])->name('reports');
         
         // Teacher-specific approval management (for their batches)

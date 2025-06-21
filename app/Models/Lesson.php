@@ -55,7 +55,6 @@ class Lesson extends Model
 
     /**
      * Get the teacher that owns the lesson.
-     * If teacher_id is null, get through batch relationship
      */
     public function teacher(): BelongsTo
     {
@@ -63,16 +62,7 @@ class Lesson extends Model
     }
 
     /**
-     * Get the teacher through batch if direct relationship doesn't exist
-     */
-    public function getTeacherAttribute()
-    {
-        return $this->teacher_id ? $this->teacher : $this->batch->teacher;
-    }
-
-    /**
      * Get all attendance records for this class.
-     * Using your existing Attendance model structure
      */
     public function attendances(): HasMany
     {
@@ -188,7 +178,6 @@ class Lesson extends Model
 
     /**
      * Get attendance statistics for this class
-     * Using your existing Attendance model scopes
      */
     public function getAttendanceStats()
     {
@@ -197,7 +186,7 @@ class Lesson extends Model
         
         if ($total === 0) {
             // Get approved student count from batch
-            $batchStudentCount = $this->batch->students()->approved()->count();
+            $batchStudentCount = $this->batch->students()->count();
             return [
                 'total_students' => $batchStudentCount,
                 'present_count' => 0,
@@ -221,11 +210,11 @@ class Lesson extends Model
     }
 
     /**
-     * Start the class (update status to live or ongoing)
+     * Start the class (update status to live)
      */
     public function start()
     {
-        $this->update(['status' => 'live']); // Use 'live' or 'ongoing' based on preference
+        $this->update(['status' => 'live']);
         return $this;
     }
 
@@ -278,14 +267,14 @@ class Lesson extends Model
 
         return [
             'meeting_id' => $this->zoom_meeting_id,
-            'join_url' => $this->zoom_link, // Using your existing field name
+            'join_url' => $this->zoom_link,
             'start_url' => $this->zoom_start_url,
             'password' => $this->zoom_password,
         ];
     }
 
     /**
-     * Boot method to set teacher_id when creating
+     * Boot method to set defaults
      */
     protected static function boot()
     {
@@ -295,9 +284,14 @@ class Lesson extends Model
             // Set teacher_id from batch if not set
             if (!$lesson->teacher_id && $lesson->batch_id) {
                 $batch = Batch::find($lesson->batch_id);
-                if ($batch) {
+                if ($batch && $batch->teacher_id) {
                     $lesson->teacher_id = $batch->teacher_id;
                 }
+            }
+            
+            // Set default status if not set
+            if (!$lesson->status) {
+                $lesson->status = 'scheduled';
             }
         });
     }

@@ -1,5 +1,8 @@
 <?php
 
+// SIMPLEST FIX: Since your routes already have perfect middleware,
+// you don't need auth checks in the controller at all!
+
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
@@ -15,14 +18,17 @@ use Carbon\Carbon;
 
 class QuizController extends Controller
 {
+    // ✅ NO CONSTRUCTOR NEEDED - your routes handle auth!
+
     /**
      * Display a listing of the quizzes for the authenticated teacher
      */
     public function index(Request $request)
     {
+        // ✅ NO AUTH CHECK NEEDED - middleware handles it!
         $user = Auth::user();
         
-        $query = Quiz::with(['batch:id,name,teacher_id', 'questions:quiz_id,id'])
+        $query = Quiz::with(['batch', 'questions:quiz_id,id'])
             ->whereHas('batch', function ($q) use ($user) {
                 $q->where('teacher_id', $user->id);
             })
@@ -64,6 +70,12 @@ class QuizController extends Controller
                 : 0;
             $quiz->is_available = $this->isQuizAvailable($quiz);
             $quiz->can_edit = $this->canEditQuiz($quiz);
+            
+            // Add the batch data with student count
+            if ($quiz->batch) {
+                $quiz->batch->student_count = $quiz->batch->students()->count();
+            }
+            
             unset($quiz->questions); // Remove to reduce payload
             return $quiz;
         });
@@ -74,13 +86,21 @@ class QuizController extends Controller
         // Get teacher's batches for filter dropdown
         $batches = Batch::where('teacher_id', $user->id)
             ->select('id', 'name')
+            ->withCount('students')
             ->get();
 
         return Inertia::render('Teacher/Quizzes/Index', [
+            'auth' => [
+                'user' => $user // ← Fixed the missing auth prop
+            ],
             'quizzes' => $quizzes,
             'stats' => $stats,
             'batches' => $batches,
-            'filters' => $request->only(['status', 'batch_id', 'search'])
+            'filters' => $request->only(['status', 'batch_id', 'search']),
+            'flash' => [
+                'success' => session('success'),
+                'error' => session('error')
+            ]
         ]);
     }
 
@@ -89,12 +109,16 @@ class QuizController extends Controller
      */
     public function create()
     {
+        // ✅ NO AUTH CHECK NEEDED - middleware handles it!
         $user = Auth::user();
         $batches = Batch::where('teacher_id', $user->id)
-            ->with('students:id,name,email')
+            ->withCount('students')
             ->get();
 
         return Inertia::render('Teacher/Quizzes/Create', [
+            'auth' => [
+                'user' => $user // ← Fixed the missing auth prop
+            ],
             'batches' => $batches
         ]);
     }
@@ -104,6 +128,7 @@ class QuizController extends Controller
      */
     public function store(Request $request)
     {
+        // ✅ NO AUTH CHECK NEEDED - middleware handles it!
         $user = Auth::user();
         
         $request->validate([
@@ -169,7 +194,7 @@ class QuizController extends Controller
         $this->authorizeQuizAccess($quiz);
 
         $quiz->load([
-            'batch:id,name,student_count',
+            'batch',
             'questions' => function ($q) {
                 $q->orderBy('order');
             },
@@ -188,6 +213,9 @@ class QuizController extends Controller
         $quiz->can_edit = $this->canEditQuiz($quiz);
 
         return Inertia::render('Teacher/Quizzes/Show', [
+            'auth' => [
+                'user' => Auth::user()
+            ],
             'quiz' => $quiz,
             'analytics' => $analytics,
             'recentAttempts' => $quiz->attempts
@@ -208,11 +236,15 @@ class QuizController extends Controller
         $user = Auth::user();
         $batches = Batch::where('teacher_id', $user->id)
             ->select('id', 'name')
+            ->withCount('students')
             ->get();
 
         $quiz->can_edit = $this->canEditQuiz($quiz);
 
         return Inertia::render('Teacher/Quizzes/Edit', [
+            'auth' => [
+                'user' => $user
+            ],
             'quiz' => $quiz,
             'batches' => $batches
         ]);
@@ -344,7 +376,7 @@ class QuizController extends Controller
     {
         $this->authorizeQuizAccess($quiz);
 
-        $quiz->load(['batch:id,name,student_count']);
+        $quiz->load(['batch']);
 
         $attempts = QuizAttempt::with(['student:id,name,email'])
             ->where('quiz_id', $quiz->id)
@@ -355,6 +387,9 @@ class QuizController extends Controller
         $analytics = $this->getQuizAnalytics($quiz);
 
         return Inertia::render('Teacher/Quizzes/Results', [
+            'auth' => [
+                'user' => Auth::user()
+            ],
             'quiz' => $quiz,
             'attempts' => $attempts,
             'analytics' => $analytics
@@ -395,6 +430,7 @@ class QuizController extends Controller
     }
 
     // Private helper methods
+    
     private function authorizeQuizAccess(Quiz $quiz)
     {
         if ($quiz->batch->teacher_id !== Auth::id()) {
@@ -425,8 +461,8 @@ class QuizController extends Controller
         
         return [
             'total_attempts' => $totalAttempts,
-            'completion_rate' => $quiz->batch->student_count > 0 
-                ? ($totalAttempts / $quiz->batch->student_count) * 100 
+            'completion_rate' => $quiz->batch->students()->count() > 0 
+                ? ($totalAttempts / $quiz->batch->students()->count()) * 100 
                 : 0,
             'average_score' => $scores->avg() ?? 0,
             'highest_score' => $scores->max() ?? 0,

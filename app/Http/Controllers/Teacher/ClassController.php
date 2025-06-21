@@ -20,32 +20,50 @@ class ClassController extends Controller
     /**
      * Display a listing of classes
      */
-    public function index()
+    public function index(Request $request)
     {
         $teacher = Auth::user();
         
         try {
-            $classes = Lesson::with(['batch:id,name,teacher_id'])
-                ->whereHas('batch', function ($query) use ($teacher) {
-                    $query->where('teacher_id', $teacher->id);
-                })
-                ->orderBy('scheduled_at', 'desc')
-                ->paginate(15);
+            // Build query with search and filters
+            $query = Lesson::with(['batch' => function($q) {
+                $q->select('id', 'name', 'teacher_id');
+                $q->withCount('students');
+            }])
+            ->whereHas('batch', function ($q) use ($teacher) {
+                $q->where('teacher_id', $teacher->id);
+            });
+
+            // Apply search filter
+            if ($request->filled('search')) {
+                $search = $request->get('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%")
+                      ->orWhereHas('batch', function ($bq) use ($search) {
+                          $bq->where('name', 'like', "%{$search}%");
+                      });
+                });
+            }
+
+            // Apply status filter
+            if ($request->filled('status')) {
+                $query->where('status', $request->get('status'));
+            }
+
+            $classes = $query->orderBy('scheduled_at', 'desc')->paginate(15);
 
             // Calculate basic stats
+            $statsQuery = Lesson::whereHas('batch', function ($query) use ($teacher) {
+                $query->where('teacher_id', $teacher->id);
+            });
+
             $stats = [
-                'total_classes' => Lesson::whereHas('batch', function ($query) use ($teacher) {
-                    $query->where('teacher_id', $teacher->id);
-                })->count(),
-                'upcoming_classes' => Lesson::whereHas('batch', function ($query) use ($teacher) {
-                    $query->where('teacher_id', $teacher->id);
-                })->where('scheduled_at', '>', now())->count(),
-                'completed_classes' => Lesson::whereHas('batch', function ($query) use ($teacher) {
-                    $query->where('teacher_id', $teacher->id);
-                })->where('status', 'completed')->count(),
-                'classes_today' => Lesson::whereHas('batch', function ($query) use ($teacher) {
-                    $query->where('teacher_id', $teacher->id);
-                })->whereDate('scheduled_at', today())->count(),
+                'total_classes' => $statsQuery->count(),
+                'upcoming_classes' => $statsQuery->where('scheduled_at', '>', now())
+                    ->where('status', 'scheduled')->count(),
+                'completed_classes' => $statsQuery->where('status', 'completed')->count(),
+                'classes_today' => $statsQuery->whereDate('scheduled_at', today())->count(),
             ];
 
             return Inertia::render('Teacher/Classes/Index', [
@@ -56,7 +74,7 @@ class ClassController extends Controller
                         'id' => $teacher->id,
                         'name' => $teacher->name,
                         'email' => $teacher->email,
-                        'role' => $teacher->role->value,
+                        'role' => $teacher->role->value ?? $teacher->role,
                     ]
                 ]
             ]);
@@ -64,7 +82,8 @@ class ClassController extends Controller
         } catch (\Exception $e) {
             Log::error('Classes index failed', [
                 'teacher_id' => $teacher->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             
             return Inertia::render('Teacher/Classes/Index', [
@@ -80,10 +99,115 @@ class ClassController extends Controller
                         'id' => $teacher->id,
                         'name' => $teacher->name,
                         'email' => $teacher->email,
-                        'role' => $teacher->role->value,
+                        'role' => $teacher->role->value ?? $teacher->role,
+                    ]
+                ],
+                'flash' => [
+                    'error' => 'Unable to load classes. Please try again.'
+                ]
+            ]);
+        }
+    }
+
+    /**
+     * Display the specified class
+     */
+    public function show($id)
+    {
+        $teacher = Auth::user();
+        
+        try {
+            Log::info('Attempting to show class', [
+                'class_id' => $id,
+                'teacher_id' => $teacher->id
+            ]);
+
+            // First, let's check if the class exists at all
+            $classExists = Lesson::where('id', $id)->exists();
+            
+            if (!$classExists) {
+                Log::warning('Class not found', ['class_id' => $id]);
+                return redirect()->route('teacher.classes.index')
+                    ->with('error', 'Class not found.');
+            }
+
+            // Get the class with proper authorization check
+            $class = Lesson::with([
+                'batch' => function($q) {
+                    $q->select('id', 'name', 'teacher_id', 'description');
+                    $q->with(['students' => function($sq) {
+                        $sq->select('users.id', 'users.name', 'users.email');
+                    }]);
+                },
+                'attendances' => function($q) {
+                    $q->with(['user' => function($uq) {
+                        $uq->select('id', 'name', 'email');
+                    }]);
+                }
+            ])->find($id);
+
+            if (!$class) {
+                Log::warning('Class not found after query', ['class_id' => $id]);
+                return redirect()->route('teacher.classes.index')
+                    ->with('error', 'Class not found.');
+            }
+
+            // Check if teacher has permission to view this class
+            if (!$class->batch || $class->batch->teacher_id !== $teacher->id) {
+                Log::warning('Teacher access denied', [
+                    'class_id' => $id,
+                    'teacher_id' => $teacher->id,
+                    'batch_teacher_id' => $class->batch?->teacher_id
+                ]);
+                return redirect()->route('teacher.classes.index')
+                    ->with('error', 'You do not have permission to view this class.');
+            }
+
+            // Get students from the batch
+            $students = $class->batch->students ?? collect();
+
+            // Calculate attendance stats with safety checks
+            $attendanceStats = $this->calculateAttendanceStats($class, $students);
+
+            // Format class data for frontend
+            $classData = $this->formatClassData($class);
+
+            Log::info('Class show successful', [
+                'class_id' => $id,
+                'teacher_id' => $teacher->id,
+                'student_count' => $students->count()
+            ]);
+
+            return Inertia::render('Teacher/Classes/Show', [
+                'classData' => $classData,
+                'students' => $students->map(function ($student) {
+                    return [
+                        'id' => $student->id,
+                        'name' => $student->name,
+                        'email' => $student->email,
+                    ];
+                })->toArray(),
+                'attendanceStats' => $attendanceStats,
+                'auth' => [
+                    'user' => [
+                        'id' => $teacher->id,
+                        'name' => $teacher->name,
+                        'email' => $teacher->email,
+                        'role' => $teacher->role->value ?? $teacher->role,
                     ]
                 ]
             ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Class show failed', [
+                'class_id' => $id,
+                'teacher_id' => $teacher->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return redirect()->route('teacher.classes.index')
+                ->with('error', 'Unable to load class details. Please try again.');
         }
     }
 
@@ -95,7 +219,7 @@ class ClassController extends Controller
         $teacher = Auth::user();
         
         try {
-            // Get teacher's batches with student counts - optimized query
+            // Get teacher's batches with student counts
             $batches = Batch::where('teacher_id', $teacher->id)
                 ->where('is_active', 1)
                 ->withCount('students')
@@ -117,7 +241,7 @@ class ClassController extends Controller
                         'id' => $teacher->id,
                         'name' => $teacher->name,
                         'email' => $teacher->email,
-                        'role' => $teacher->role->value,
+                        'role' => $teacher->role->value ?? $teacher->role,
                     ]
                 ]
             ]);
@@ -135,8 +259,11 @@ class ClassController extends Controller
                         'id' => $teacher->id,
                         'name' => $teacher->name,
                         'email' => $teacher->email,
-                        'role' => $teacher->role->value,
+                        'role' => $teacher->role->value ?? $teacher->role,
                     ]
+                ],
+                'flash' => [
+                    'error' => 'Unable to load batches. Please try again.'
                 ]
             ]);
         }
@@ -158,8 +285,8 @@ class ClassController extends Controller
                 'scheduled_at' => 'required|date|after:now',
                 'duration_minutes' => 'required|integer|min:15|max:480',
                 'zoom_link' => 'nullable|url',
+                'zoom_password' => 'nullable|string|max:50',
                 'notes' => 'nullable|string|max:1000',
-                'create_attendance' => 'boolean'
             ]);
 
             // Verify teacher owns the batch
@@ -173,55 +300,27 @@ class ClassController extends Controller
                 ])->withInput();
             }
 
-            // Use DB transaction for data consistency
             DB::beginTransaction();
 
             try {
-                // Create the class using Eloquent model
-                $class = new Lesson();
-                $class->title = $validated['title'];
-                $class->description = $validated['description'];
-                $class->batch_id = $validated['batch_id'];
-                $class->scheduled_at = Carbon::parse($validated['scheduled_at']);
-                $class->duration_minutes = $validated['duration_minutes'];
-                $class->status = 'scheduled';
-                
-                // Add optional fields if they exist
-                if (Schema::hasColumn('classes', 'teacher_id')) {
-                    $class->teacher_id = $teacher->id;
-                }
-                if (isset($validated['zoom_link']) && Schema::hasColumn('classes', 'zoom_link')) {
-                    $class->zoom_link = $validated['zoom_link'];
-                }
-                if (isset($validated['notes']) && Schema::hasColumn('classes', 'notes')) {
-                    $class->notes = $validated['notes'];
-                }
-                
-                $class->save();
-
-                // Create attendance records if requested
-                if ($request->boolean('create_attendance')) {
-                    $students = $batch->students()->pluck('user_id');
-                    
-                    $attendanceRecords = $students->map(function ($studentId) use ($class) {
-                        return [
-                            'class_id' => $class->id,
-                            'user_id' => $studentId,
-                            'status' => 'absent',
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ];
-                    })->toArray();
-
-                    if (!empty($attendanceRecords)) {
-                        Attendance::insert($attendanceRecords);
-                    }
-                }
+                // Create the class
+                $class = Lesson::create([
+                    'title' => $validated['title'],
+                    'description' => $validated['description'],
+                    'batch_id' => $validated['batch_id'],
+                    'teacher_id' => $teacher->id,
+                    'scheduled_at' => Carbon::parse($validated['scheduled_at']),
+                    'duration_minutes' => $validated['duration_minutes'],
+                    'status' => 'scheduled',
+                    'zoom_link' => $validated['zoom_link'] ?? null,
+                    'zoom_password' => $validated['zoom_password'] ?? null,
+                    'notes' => $validated['notes'] ?? null,
+                ]);
 
                 DB::commit();
 
                 return redirect()->route('teacher.classes.index')
-                               ->with('success', 'Class scheduled successfully!');
+                               ->with('success', 'Class created successfully!');
 
             } catch (\Exception $e) {
                 DB::rollBack();
@@ -239,79 +338,8 @@ class ClassController extends Controller
             ]);
             
             return back()
-                ->withErrors(['general' => 'Failed to create class. Please try again.'])
+                ->with('error', 'Failed to create class. Please try again.')
                 ->withInput();
-        }
-    }
-
-    /**
-     * Display the specified class
-     */
-    public function show($id)
-    {
-        $teacher = Auth::user();
-        
-        try {
-            // Optimized query to get class with all related data
-            $class = Lesson::with([
-                'batch:id,name,teacher_id,description',
-                'attendances.user:id,name,email'
-            ])
-            ->whereHas('batch', function ($query) use ($teacher) {
-                $query->where('teacher_id', $teacher->id);
-            })
-            ->findOrFail($id);
-
-            // Get students in this batch with better query
-            $students = $class->batch->students()
-                ->select('users.id', 'users.name', 'users.email')
-                ->get();
-
-            // Calculate attendance stats
-            $attendanceStats = [
-                'total_students' => $students->count(),
-                'present_count' => $class->attendances->where('status', 'present')->count(),
-                'absent_count' => $class->attendances->where('status', 'absent')->count(),
-                'late_count' => $class->attendances->where('status', 'late')->count(),
-            ];
-            $attendanceStats['attendance_rate'] = $attendanceStats['total_students'] > 0 
-                ? round(($attendanceStats['present_count'] / $attendanceStats['total_students']) * 100, 1)
-                : 0;
-
-            // Add formatted fields
-            $class->formatted_duration = $this->formatDuration($class->duration_minutes);
-            $class->can_start = $this->canStartClass($class);
-            $class->is_upcoming = $class->scheduled_at > now();
-            $class->is_completed = $class->status === 'completed';
-
-            return Inertia::render('Teacher/Classes/Show', [
-                'classData' => $class->toArray(), // Use 'classData' consistently
-                'students' => $students->toArray(),
-                'attendanceStats' => $attendanceStats,
-                'auth' => [
-                    'user' => [
-                        'id' => $teacher->id,
-                        'name' => $teacher->name,
-                        'email' => $teacher->email,
-                        'role' => $teacher->role->value,
-                    ]
-                ]
-            ]);
-            
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return redirect()->route('teacher.classes.index')
-                ->withErrors(['general' => 'Class not found.']);
-                
-        } catch (\Exception $e) {
-            Log::error('Class show failed', [
-                'class_id' => $id,
-                'teacher_id' => $teacher->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            
-            return redirect()->route('teacher.classes.index')
-                ->withErrors(['general' => 'Unable to load class details. Please try again.']);
         }
     }
 
@@ -323,19 +351,28 @@ class ClassController extends Controller
         $teacher = Auth::user();
         
         try {
-            $class = Lesson::with('batch:id,name,teacher_id')
-                ->whereHas('batch', function ($query) use ($teacher) {
-                    $query->where('teacher_id', $teacher->id);
-                })
-                ->findOrFail($id);
+            $class = Lesson::with(['batch' => function($q) {
+                $q->select('id', 'name', 'teacher_id');
+            }])->find($id);
 
-            // Don't allow editing completed or ongoing classes
-            if (in_array($class->status, ['completed', 'ongoing'])) {
+            if (!$class) {
                 return redirect()->route('teacher.classes.index')
-                    ->withErrors(['general' => 'Cannot edit completed or ongoing classes.']);
+                    ->with('error', 'Class not found.');
             }
 
-            // Get teacher's batches with optimized query
+            // Check teacher permission
+            if (!$class->batch || $class->batch->teacher_id !== $teacher->id) {
+                return redirect()->route('teacher.classes.index')
+                    ->with('error', 'You do not have permission to edit this class.');
+            }
+
+            // Don't allow editing completed classes
+            if (in_array($class->status, ['completed', 'live'])) {
+                return redirect()->route('teacher.classes.index')
+                    ->with('error', 'Cannot edit completed or live classes.');
+            }
+
+            // Get teacher's batches
             $batches = Batch::where('teacher_id', $teacher->id)
                 ->where('is_active', 1)
                 ->withCount('students')
@@ -351,14 +388,14 @@ class ClassController extends Controller
                 });
 
             return Inertia::render('Teacher/Classes/Edit', [
-                'classData' => $class->toArray(),
+                'classData' => $this->formatClassData($class),
                 'batches' => $batches->toArray(),
                 'auth' => [
                     'user' => [
                         'id' => $teacher->id,
                         'name' => $teacher->name,
                         'email' => $teacher->email,
-                        'role' => $teacher->role->value,
+                        'role' => $teacher->role->value ?? $teacher->role,
                     ]
                 ]
             ]);
@@ -371,7 +408,7 @@ class ClassController extends Controller
             ]);
             
             return redirect()->route('teacher.classes.index')
-                ->withErrors(['general' => 'Class not found or access denied.']);
+                ->with('error', 'Class not found or access denied.');
         }
     }
 
@@ -383,15 +420,22 @@ class ClassController extends Controller
         $teacher = Auth::user();
         
         try {
-            $class = Lesson::whereHas('batch', function ($query) use ($teacher) {
-                $query->where('teacher_id', $teacher->id);
-            })->findOrFail($id);
+            $class = Lesson::with('batch')->find($id);
 
-            // Don't allow updating completed or ongoing classes
-            if (in_array($class->status, ['completed', 'ongoing'])) {
-                return back()->withErrors([
-                    'general' => 'Cannot update completed or ongoing classes.'
-                ]);
+            if (!$class) {
+                return redirect()->route('teacher.classes.index')
+                    ->with('error', 'Class not found.');
+            }
+
+            // Check teacher permission
+            if (!$class->batch || $class->batch->teacher_id !== $teacher->id) {
+                return redirect()->route('teacher.classes.index')
+                    ->with('error', 'You do not have permission to update this class.');
+            }
+
+            // Don't allow updating completed classes
+            if (in_array($class->status, ['completed', 'live'])) {
+                return back()->with('error', 'Cannot update completed or live classes.');
             }
 
             // Validate request data
@@ -399,9 +443,10 @@ class ClassController extends Controller
                 'title' => 'required|string|max:255',
                 'description' => 'nullable|string|max:1000',
                 'batch_id' => 'required|integer|exists:batches,id',
-                'scheduled_at' => 'required|date|after:now',
+                'scheduled_at' => 'required|date',
                 'duration_minutes' => 'required|integer|min:15|max:480',
                 'zoom_link' => 'nullable|url',
+                'zoom_password' => 'nullable|string|max:50',
                 'notes' => 'nullable|string|max:1000',
             ]);
 
@@ -418,24 +463,19 @@ class ClassController extends Controller
                 }
             }
 
-            // Update using Eloquent model
-            $class->title = $validated['title'];
-            $class->description = $validated['description'];
-            $class->batch_id = $validated['batch_id'];
-            $class->scheduled_at = Carbon::parse($validated['scheduled_at']);
-            $class->duration_minutes = $validated['duration_minutes'];
+            // Update the class
+            $class->update([
+                'title' => $validated['title'],
+                'description' => $validated['description'],
+                'batch_id' => $validated['batch_id'],
+                'scheduled_at' => Carbon::parse($validated['scheduled_at']),
+                'duration_minutes' => $validated['duration_minutes'],
+                'zoom_link' => $validated['zoom_link'] ?? null,
+                'zoom_password' => $validated['zoom_password'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ]);
 
-            if (isset($validated['zoom_link']) && Schema::hasColumn('classes', 'zoom_link')) {
-                $class->zoom_link = $validated['zoom_link'];
-            }
-
-            if (isset($validated['notes']) && Schema::hasColumn('classes', 'notes')) {
-                $class->notes = $validated['notes'];
-            }
-
-            $class->save();
-
-            return redirect()->route('teacher.classes.index')
+            return redirect()->route('teacher.classes.show', $class->id)
                            ->with('success', 'Class updated successfully!');
                            
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -449,7 +489,7 @@ class ClassController extends Controller
             ]);
             
             return back()
-                ->withErrors(['general' => 'Failed to update class. Please try again.'])
+                ->with('error', 'Failed to update class. Please try again.')
                 ->withInput();
         }
     }
@@ -462,18 +502,24 @@ class ClassController extends Controller
         $teacher = Auth::user();
         
         try {
-            $class = Lesson::whereHas('batch', function ($query) use ($teacher) {
-                $query->where('teacher_id', $teacher->id);
-            })->findOrFail($id);
+            $class = Lesson::with('batch')->find($id);
 
-            // Don't allow deleting completed or ongoing classes
-            if (in_array($class->status, ['completed', 'ongoing'])) {
-                return back()->withErrors([
-                    'general' => 'Cannot delete completed or ongoing classes.'
-                ]);
+            if (!$class) {
+                return redirect()->route('teacher.classes.index')
+                    ->with('error', 'Class not found.');
             }
 
-            // Use DB transaction for consistency
+            // Check teacher permission
+            if (!$class->batch || $class->batch->teacher_id !== $teacher->id) {
+                return redirect()->route('teacher.classes.index')
+                    ->with('error', 'You do not have permission to delete this class.');
+            }
+
+            // Don't allow deleting completed or live classes
+            if (in_array($class->status, ['completed', 'live'])) {
+                return back()->with('error', 'Cannot delete completed or live classes.');
+            }
+
             DB::beginTransaction();
             
             try {
@@ -499,32 +545,36 @@ class ClassController extends Controller
                 'error' => $e->getMessage()
             ]);
             
-            return back()->withErrors([
-                'general' => 'Failed to delete class. Please try again.'
-            ]);
+            return back()->with('error', 'Failed to delete class. Please try again.');
         }
     }
 
     /**
      * Mark class as completed
      */
-    public function markCompleted($id)
+    public function complete($id)
     {
         $teacher = Auth::user();
         
         try {
-            $class = Lesson::whereHas('batch', function ($query) use ($teacher) {
-                $query->where('teacher_id', $teacher->id);
-            })->findOrFail($id);
+            $class = Lesson::with('batch')->find($id);
 
-            if ($class->status === 'completed') {
-                return back()->withErrors([
-                    'general' => 'Class is already marked as completed.'
-                ]);
+            if (!$class) {
+                return redirect()->route('teacher.classes.index')
+                    ->with('error', 'Class not found.');
             }
 
-            $class->status = 'completed';
-            $class->save();
+            // Check teacher permission
+            if (!$class->batch || $class->batch->teacher_id !== $teacher->id) {
+                return redirect()->route('teacher.classes.index')
+                    ->with('error', 'You do not have permission to update this class.');
+            }
+
+            if ($class->status === 'completed') {
+                return back()->with('error', 'Class is already marked as completed.');
+            }
+
+            $class->update(['status' => 'completed']);
 
             return back()->with('success', 'Class marked as completed!');
             
@@ -535,38 +585,134 @@ class ClassController extends Controller
                 'error' => $e->getMessage()
             ]);
             
-            return back()->withErrors([
-                'general' => 'Failed to mark class as completed.'
+            return back()->with('error', 'Failed to mark class as completed.');
+        }
+    }
+
+    /**
+     * Cancel class
+     */
+    public function cancel($id)
+    {
+        $teacher = Auth::user();
+        
+        try {
+            $class = Lesson::with('batch')->find($id);
+
+            if (!$class) {
+                return redirect()->route('teacher.classes.index')
+                    ->with('error', 'Class not found.');
+            }
+
+            // Check teacher permission
+            if (!$class->batch || $class->batch->teacher_id !== $teacher->id) {
+                return redirect()->route('teacher.classes.index')
+                    ->with('error', 'You do not have permission to update this class.');
+            }
+
+            $class->update(['status' => 'cancelled']);
+
+            return back()->with('success', 'Class cancelled successfully!');
+            
+        } catch (\Exception $e) {
+            Log::error('Class cancellation failed', [
+                'class_id' => $id,
+                'teacher_id' => $teacher->id,
+                'error' => $e->getMessage()
             ]);
+            
+            return back()->with('error', 'Failed to cancel class.');
         }
     }
 
     /**
-     * Helper method to format duration
+     * Calculate attendance statistics
      */
-    private function formatDuration($minutes)
+    private function calculateAttendanceStats($class, $students)
     {
-        $hours = floor($minutes / 60);
-        $mins = $minutes % 60;
+        $totalStudents = $students->count();
         
-        if ($hours > 0) {
-            return $hours . 'h ' . $mins . 'm';
+        if ($totalStudents === 0) {
+            return [
+                'total_students' => 0,
+                'present_count' => 0,
+                'absent_count' => 0,
+                'late_count' => 0,
+                'attendance_rate' => 0,
+            ];
         }
+
+        $attendances = $class->attendances ?? collect();
         
-        return $mins . ' minutes';
+        $presentCount = $attendances->where('status', 'present')->count();
+        $absentCount = $attendances->where('status', 'absent')->count();
+        $lateCount = $attendances->where('status', 'late')->count();
+        
+        // Calculate attendance rate (present + late students)
+        $attendanceRate = $totalStudents > 0 
+            ? round((($presentCount + $lateCount) / $totalStudents) * 100, 1)
+            : 0;
+
+        return [
+            'total_students' => $totalStudents,
+            'present_count' => $presentCount,
+            'absent_count' => $absentCount,
+            'late_count' => $lateCount,
+            'attendance_rate' => $attendanceRate,
+        ];
     }
 
     /**
-     * Helper method to determine if class can be started
+     * Format class data for frontend
      */
-    private function canStartClass($class)
+    private function formatClassData($class)
     {
-        $now = now();
+        $now = Carbon::now();
         $scheduledTime = Carbon::parse($class->scheduled_at);
         
-        // Can start 15 minutes before scheduled time
-        return $class->status === 'scheduled' 
-            && $now >= $scheduledTime->subMinutes(15)
-            && $class->zoom_start_url;
+        // Check if class can be started (15 minutes before to 30 minutes after)
+        $canStart = $scheduledTime->diffInMinutes($now, false) >= -15 
+                   && $scheduledTime->diffInMinutes($now, false) <= 30 
+                   && $class->status === 'scheduled';
+
+        // Format duration
+        $hours = floor($class->duration_minutes / 60);
+        $minutes = $class->duration_minutes % 60;
+        $formattedDuration = $hours > 0 
+            ? ($minutes > 0 ? "{$hours}h {$minutes}m" : "{$hours}h")
+            : "{$minutes}m";
+
+        return [
+            'id' => $class->id,
+            'title' => $class->title,
+            'description' => $class->description,
+            'scheduled_at' => $class->scheduled_at->toISOString(),
+            'duration_minutes' => $class->duration_minutes,
+            'formatted_duration' => $formattedDuration,
+            'status' => $class->status,
+            'zoom_meeting_id' => $class->zoom_meeting_id,
+            'zoom_join_url' => $class->zoom_link, // Using your field name
+            'zoom_start_url' => $class->zoom_start_url,
+            'zoom_password' => $class->zoom_password,
+            'recording_url' => $class->recording_url,
+            'notes' => $class->notes,
+            'max_attendees' => $class->max_attendees,
+            'can_start' => $canStart,
+            'is_upcoming' => $scheduledTime->isFuture(),
+            'is_completed' => $class->status === 'completed',
+            'batch' => [
+                'id' => $class->batch->id,
+                'name' => $class->batch->name,
+                'description' => $class->batch->description ?? '',
+                'student_count' => $class->batch->students ? $class->batch->students->count() : 0,
+            ],
+            'teacher' => $class->batch ? [
+                'id' => $class->batch->teacher_id,
+                'name' => $class->batch->teacher->name ?? 'Unknown',
+                'email' => $class->batch->teacher->email ?? '',
+            ] : null,
+            'created_at' => $class->created_at ? $class->created_at->toISOString() : null,
+            'updated_at' => $class->updated_at ? $class->updated_at->toISOString() : null,
+        ];
     }
 }

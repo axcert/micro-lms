@@ -47,6 +47,7 @@ class Batch extends Model
      */
     protected $appends = [
         'students_count',
+        'student_count', 
         'is_full',
         'days_until_start',
         'status_text',
@@ -323,6 +324,14 @@ class Batch extends Model
     public function hasStudent(User $student): bool
     {
         return $this->students()->where('student_id', $student->id)->exists();
+    }
+
+    /**
+ * Get the student count for the batch (compatibility accessor).
+ */
+    public function getStudentCountAttribute(): int
+    {
+         return $this->students_count; // Delegate to the existing accessor
     }
 
     /**
