@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class QuizAttempt extends Model
 {
@@ -12,28 +13,27 @@ class QuizAttempt extends Model
 
     protected $fillable = [
         'quiz_id',
-        'student_id',      // Your actual column name
+        'user_id',        // Your actual column name (not student_id)
         'started_at',
         'submitted_at',
-        'total_score',     // Your actual column name
-        'max_score',       // Your actual column name
-        'status',          // Your actual column name
-        'question_order',
+        'score',          // Your actual column name
+        'percentage',     // Your actual column name
+        'answers',        // Your actual column name
+        'is_completed',   // Your actual column name
     ];
 
     protected $casts = [
         'started_at' => 'datetime',
         'submitted_at' => 'datetime',
-        'total_score' => 'decimal:2',
-        'max_score' => 'decimal:2',
-        'question_order' => 'array',
+        'score' => 'decimal:2',
+        'percentage' => 'decimal:2',
+        'answers' => 'json',
+        'is_completed' => 'boolean',
     ];
 
-    // Status constants based on your actual database
-    const STATUS_STARTED = 'started';
-    const STATUS_IN_PROGRESS = 'in_progress';
-    const STATUS_SUBMITTED = 'submitted';
-    const STATUS_COMPLETED = 'completed';
+    // =============================================================================
+    // RELATIONSHIPS
+    // =============================================================================
 
     /**
      * Get the quiz that this attempt belongs to.
@@ -45,84 +45,146 @@ class QuizAttempt extends Model
 
     /**
      * Get the student who made this attempt.
-     * Using student_id as the foreign key
+     * Using user_id as the foreign key (your actual column)
      */
     public function student(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'student_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     /**
-     * Alias for student() method for consistency with other code
+     * Alias for student() method for consistency
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'student_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     /**
-     * Calculate the percentage score based on your schema
+     * Get quiz answers for this attempt
      */
-    public function getPercentageAttribute(): float
+    public function quizAnswers(): HasMany
     {
-        if ($this->max_score == 0) {
-            return 0;
+        return $this->hasMany(QuizAnswer::class);
+    }
+
+    // =============================================================================
+    // ACCESSORS & COMPUTED ATTRIBUTES
+    // =============================================================================
+
+    /**
+     * Check if the student passed based on quiz pass marks
+     */
+    public function getHasPassedAttribute(): bool
+    {
+        if (!$this->quiz) {
+            $this->load('quiz');
         }
         
-        return round(($this->total_score / $this->max_score) * 100, 2);
+        return $this->score >= $this->quiz->pass_marks;
     }
 
     /**
-     * Check if the attempt is completed
+     * Get time taken in minutes
      */
-    public function getIsCompletedAttribute(): bool
-    {
-        return in_array($this->status, [self::STATUS_SUBMITTED, self::STATUS_COMPLETED]);
-    }
-
-    /**
-     * Get time taken in seconds
-     */
-    public function getTimeTakenAttribute(): ?int
+    public function getTimeTakenMinutesAttribute(): ?int
     {
         if (!$this->started_at || !$this->submitted_at) {
             return null;
         }
 
-        return $this->submitted_at->diffInSeconds($this->started_at);
+        return $this->submitted_at->diffInMinutes($this->started_at);
     }
 
     /**
      * Get formatted time taken
      */
-    public function getFormattedTimeTakenAttribute(): string
+    public function getTimeTakenFormattedAttribute(): string
     {
-        $timeTaken = $this->time_taken;
+        $minutes = $this->time_taken_minutes;
         
-        if (!$timeTaken) {
+        if (!$minutes) {
             return 'N/A';
         }
 
-        $minutes = floor($timeTaken / 60);
-        $seconds = $timeTaken % 60;
+        $hours = floor($minutes / 60);
+        $mins = $minutes % 60;
 
-        return sprintf('%02d:%02d', $minutes, $seconds);
+        if ($hours > 0) {
+            return "{$hours}h {$mins}m";
+        }
+        return "{$mins}m";
     }
+
+    /**
+     * Get status display
+     */
+    public function getStatusAttribute(): string
+    {
+        if (!$this->is_completed) {
+            return 'in_progress';
+        }
+        
+        return $this->has_passed ? 'passed' : 'failed';
+    }
+
+    /**
+     * Get status color for UI
+     */
+    public function getStatusColorAttribute(): string
+    {
+        return match($this->status) {
+            'passed' => 'green',
+            'failed' => 'red',
+            'in_progress' => 'yellow',
+            default => 'gray'
+        };
+    }
+
+    /**
+     * Get grade display
+     */
+    public function getGradeAttribute(): string
+    {
+        if (!$this->is_completed) {
+            return 'Incomplete';
+        }
+
+        $percentage = $this->percentage;
+        
+        if ($percentage >= 85) return 'A';
+        if ($percentage >= 75) return 'B';
+        if ($percentage >= 65) return 'C';
+        if ($percentage >= 55) return 'D';
+        return 'F';
+    }
+
+    // =============================================================================
+    // SCOPES
+    // =============================================================================
 
     /**
      * Scope to get attempts by a specific student
      */
-    public function scopeByStudent($query, $studentId)
+    public function scopeByStudent($query, $userId)
     {
-        return $query->where('student_id', $studentId);
+        return $query->where('user_id', $userId);
     }
 
     /**
-     * Scope to get completed attempts using your status column
+     * Scope to get completed attempts
      */
     public function scopeCompleted($query)
     {
-        return $query->whereIn('status', [self::STATUS_SUBMITTED, self::STATUS_COMPLETED]);
+        return $query->where('is_completed', true);
+    }
+
+    /**
+     * Scope to get in-progress attempts
+     */
+    public function scopeInProgress($query)
+    {
+        return $query->where('is_completed', false);
     }
 
     /**
@@ -131,5 +193,107 @@ class QuizAttempt extends Model
     public function scopeForQuiz($query, $quizId)
     {
         return $query->where('quiz_id', $quizId);
+    }
+
+    /**
+     * Scope to get passed attempts (based on quiz pass marks)
+     */
+    public function scopePassed($query)
+    {
+        return $query->whereRaw('score >= (SELECT pass_marks FROM quizzes WHERE quizzes.id = quiz_attempts.quiz_id)');
+    }
+
+    /**
+     * Scope to get failed attempts
+     */
+    public function scopeFailed($query)
+    {
+        return $query->where('is_completed', true)
+                    ->whereRaw('score < (SELECT pass_marks FROM quizzes WHERE quizzes.id = quiz_attempts.quiz_id)');
+    }
+
+    /**
+     * Scope to get attempts with submitted_at not null
+     */
+    public function scopeSubmitted($query)
+    {
+        return $query->whereNotNull('submitted_at');
+    }
+
+    // =============================================================================
+    // METHODS
+    // =============================================================================
+
+    /**
+     * Check if attempt is completed
+     */
+    public function isCompleted(): bool
+    {
+        return $this->is_completed;
+    }
+
+    /**
+     * Check if attempt is in progress
+     */
+    public function isInProgress(): bool
+    {
+        return !$this->is_completed;
+    }
+
+    /**
+     * Calculate if student passed
+     */
+    public function calculateHasPassed(): bool
+    {
+        if (!$this->quiz) {
+            $this->load('quiz');
+        }
+        
+        return $this->score >= $this->quiz->pass_marks;
+    }
+
+    /**
+     * Mark attempt as completed
+     */
+    public function markAsCompleted(float $score = null, float $percentage = null): void
+    {
+        $updateData = [
+            'is_completed' => true,
+            'submitted_at' => now(),
+        ];
+
+        if ($score !== null) {
+            $updateData['score'] = $score;
+        }
+
+        if ($percentage !== null) {
+            $updateData['percentage'] = $percentage;
+        }
+
+        $this->update($updateData);
+    }
+
+    /**
+     * Calculate percentage from score and total marks
+     */
+    public function calculatePercentage(): float
+    {
+        if (!$this->quiz) {
+            $this->load('quiz');
+        }
+
+        if ($this->quiz->total_marks <= 0) {
+            return 0;
+        }
+
+        return round(($this->score / $this->quiz->total_marks) * 100, 2);
+    }
+
+    /**
+     * Update percentage based on current score
+     */
+    public function updatePercentage(): void
+    {
+        $this->update(['percentage' => $this->calculatePercentage()]);
     }
 }

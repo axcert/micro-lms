@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Log;
-use Exception;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -57,49 +56,37 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
-        'role' => UserRole::class,
+        'role' => UserRole::class, // This handles enum casting automatically
         'is_active' => 'boolean',
         'is_approved' => 'boolean',
     ];
 
+    // =============================================================================
+    // ROLE METHODS - Simplified and error-safe
+    // =============================================================================
+
     /**
-     * Handle role setting properly
+     * Check if user is admin
      */
-    public function setRoleAttribute($value)
+    public function isAdmin(): bool
     {
-        if ($value instanceof UserRole) {
-            $this->attributes['role'] = $value->value;
-        } else {
-            $this->attributes['role'] = $value;
-        }
+        return $this->role === UserRole::ADMIN;
     }
 
     /**
-     * Handle role getting properly
+     * Check if user is teacher
      */
-    public function getRoleAttribute($value)
+    public function isTeacher(): bool
     {
-        try {
-            return UserRole::from($value);
-        } catch (Exception $e) {
-            Log::warning('Invalid role value in database', [
-                'role' => $value, 
-                'user_id' => $this->id ?? 'unknown'
-            ]);
-            return UserRole::STUDENT; // Default fallback
-        }
+        return $this->role === UserRole::TEACHER;
     }
 
     /**
-     * Get the user's role display name
+     * Check if user is student
      */
-    public function getRoleDisplayNameAttribute(): string
+    public function isStudent(): bool
     {
-        try {
-            return $this->role->getDisplayName();
-        } catch (Exception $e) {
-            return 'Student'; // Fallback
-        }
+        return $this->role === UserRole::STUDENT;
     }
 
     /**
@@ -107,11 +94,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function hasRole(UserRole $role): bool
     {
-        try {
-            return $this->role === $role;
-        } catch (Exception $e) {
-            return false;
-        }
+        return $this->role === $role;
     }
 
     /**
@@ -120,11 +103,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function can($ability, $arguments = []): bool
     {
         if (is_string($ability)) {
-            try {
-                return $this->role->can($ability);
-            } catch (Exception $e) {
-                return false;
-            }
+            return $this->role && $this->role->can($ability);
         }
         
         return parent::can($ability, $arguments);
@@ -145,6 +124,19 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->is_approved ?? false;
     }
+
+    /**
+     * Check if user needs approval
+     */
+    public function needsApproval(): bool
+    {
+        // Students need approval, staff auto-approved
+        return $this->isStudent() && !$this->isApproved();
+    }
+
+    // =============================================================================
+    // USER ACTIONS
+    // =============================================================================
 
     /**
      * Approve user
@@ -177,6 +169,10 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->update(['is_active' => false]);
     }
+
+    // =============================================================================
+    // SCOPES
+    // =============================================================================
 
     /**
      * Scope for active users
@@ -243,9 +239,9 @@ class User extends Authenticatable implements MustVerifyEmail
         return $query->where('role', UserRole::ADMIN->value);
     }
 
-    /**
-     * Relationships
-     */
+    // =============================================================================
+    // RELATIONSHIPS
+    // =============================================================================
 
     /**
      * Batches created by this user (if teacher)
@@ -319,54 +315,9 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Notification::class);
     }
 
-    /**
-     * Helper methods
-     */
-
-    /**
-     * Check if user is admin
-     */
-    public function isAdmin(): bool
-    {
-        try {
-            return $this->role === UserRole::ADMIN;
-        } catch (Exception $e) {
-            return false;
-        }
-    }
-
-    /**
-     * Check if user is teacher
-     */
-    public function isTeacher(): bool
-    {
-        try {
-            return $this->role === UserRole::TEACHER;
-        } catch (Exception $e) {
-            return false;
-        }
-    }
-
-    /**
-     * Check if user is student
-     */
-    public function isStudent(): bool
-    {
-        try {
-            return $this->role === UserRole::STUDENT;
-        } catch (Exception $e) {
-            return true; // Default to student
-        }
-    }
-
-    /**
-     * Check if user needs approval
-     */
-    public function needsApproval(): bool
-    {
-        // Students need approval, staff auto-approved
-        return $this->isStudent() && !$this->isApproved();
-    }
+    // =============================================================================
+    // COMPUTED ATTRIBUTES
+    // =============================================================================
 
     /**
      * Get user's full name
@@ -445,5 +396,61 @@ class User extends Authenticatable implements MustVerifyEmail
             'inactive' => 'Inactive',
             default => 'Unknown'
         };
+    }
+
+    // =============================================================================
+    // SAFE SERIALIZATION - Critical for Inertia.js
+    // =============================================================================
+
+    /**
+     * Override toArray to handle serialization safely
+     */
+    public function toArray()
+    {
+        try {
+            $array = parent::toArray();
+            
+            // Ensure enum is properly serialized
+            if (isset($array['role']) && $array['role'] instanceof UserRole) {
+                $array['role'] = $array['role']->value;
+            }
+            
+            return $array;
+        } catch (\Exception $e) {
+            Log::error('Error serializing user to array', [
+                'user_id' => $this->id,
+                'error' => $e->getMessage()
+            ]);
+            
+            // Return safe fallback
+            return [
+                'id' => $this->id,
+                'name' => $this->name,
+                'email' => $this->email,
+                'role' => $this->attributes['role'] ?? 'student',
+                'is_active' => $this->is_active ?? false,
+                'is_approved' => $this->is_approved ?? false,
+                'created_at' => $this->created_at,
+                'updated_at' => $this->updated_at,
+            ];
+        }
+    }
+
+    /**
+     * Override toJson to handle serialization safely
+     */
+    public function toJson($options = 0)
+    {
+        try {
+            return parent::toJson($options);
+        } catch (\Exception $e) {
+            Log::error('Error serializing user to JSON', [
+                'user_id' => $this->id,
+                'error' => $e->getMessage()
+            ]);
+            
+            // Return safe fallback
+            return json_encode($this->toArray());
+        }
     }
 }

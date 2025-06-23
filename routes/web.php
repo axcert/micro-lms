@@ -8,7 +8,8 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Teacher\TeacherDashboardController;
 use App\Http\Controllers\Teacher\BatchController;
 use App\Http\Controllers\Teacher\ClassController;
-use App\Http\Controllers\Teacher\QuizController; // ADD THIS IMPORT
+use App\Http\Controllers\Teacher\QuizController;
+use App\Http\Controllers\Teacher\QuestionController; // ADD THIS IMPORT
 use App\Http\Controllers\Student\StudentDashboardController;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Foundation\Application;
@@ -129,11 +130,28 @@ Route::middleware('auth')->group(function () {
             Route::put('/{quiz}', [QuizController::class, 'update'])->name('update');
             Route::delete('/{quiz}', [QuizController::class, 'destroy'])->name('destroy');
             
+             Route::get('/{quiz}/preview', [QuizController::class, 'preview'])->name('preview');
+             Route::get('/{quiz}/results', [QuizController::class, 'results'])->name('results');
+
+
             // Quiz Actions
             Route::post('/{quiz}/activate', [QuizController::class, 'activate'])->name('activate');
             Route::post('/{quiz}/archive', [QuizController::class, 'archive'])->name('archive');
             Route::post('/{quiz}/duplicate', [QuizController::class, 'duplicate'])->name('duplicate');
             Route::get('/{quiz}/results', [QuizController::class, 'results'])->name('results');
+
+           
+        });
+        // Question Management Routes (add this after quiz routes)
+        Route::prefix('quizzes/{quiz}')->name('quizzes.')->group(function () {
+            Route::get('/questions', [QuestionController::class, 'index'])->name('questions.index');
+            Route::get('/questions/create', [QuestionController::class, 'create'])->name('questions.create');
+            Route::post('/questions', [QuestionController::class, 'store'])->name('questions.store');
+            Route::get('/questions/{question}/edit', [QuestionController::class, 'edit'])->name('questions.edit');
+            Route::put('/questions/{question}', [QuestionController::class, 'update'])->name('questions.update');
+            Route::delete('/questions/{question}', [QuestionController::class, 'destroy'])->name('questions.destroy');
+            Route::post('/questions/{question}/duplicate', [QuestionController::class, 'duplicate'])->name('questions.duplicate');
+            Route::post('/questions/reorder', [QuestionController::class, 'reorder'])->name('questions.reorder');
         });
         
         // Reports

@@ -20,19 +20,6 @@ enum UserRole: string
         ];
     }
 
-    // ❌ REMOVED: cases() method - this is auto-provided by PHP 8.1+
-    // /**
-    //  * Get all role instances
-    //  */
-    // public static function cases(): array
-    // {
-    //     return [
-    //         self::ADMIN,
-    //         self::TEACHER,
-    //         self::STUDENT,
-    //     ];
-    // }
-
     /**
      * Get role display name
      */

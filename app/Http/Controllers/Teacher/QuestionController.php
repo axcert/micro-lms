@@ -5,65 +5,79 @@ namespace App\Http\Controllers\Teacher;
 use App\Http\Controllers\Controller;
 use App\Models\Quiz;
 use App\Models\Question;
-use App\Http\Requests\Teacher\CreateQuestionRequest;
-use App\Http\Requests\Teacher\UpdateQuestionRequest;
-use App\Enums\QuestionType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class QuestionController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth');
-        $this->middleware('role:teacher');
-    }
-
     /**
      * Display questions for a specific quiz
      */
     public function index(Quiz $quiz)
     {
-        $this->authorize('view', $quiz);
+        $this->authorizeQuizAccess($quiz);
 
-        $questions = $quiz->questions()
-            ->with(['attempts' => function ($q) {
-                $q->select('question_id', 'is_correct');
-            }])
-            ->orderBy('order')
-            ->get();
+        $quiz->load([
+            'batch:id,name',
+            'questions' => function ($q) {
+                $q->orderBy('order');
+            }
+        ]);
 
-        // Calculate analytics for each question
-        $questions->transform(function ($question) {
-            $totalAttempts = $question->attempts->count();
-            $correctAttempts = $question->attempts->where('is_correct', true)->count();
-            
-            $question->attempts_count = $totalAttempts;
-            $question->correct_attempts_count = $correctAttempts;
-            $question->correct_percentage = $totalAttempts > 0 ? ($correctAttempts / $totalAttempts) * 100 : 0;
-            $question->difficulty_level = $this->calculateDifficultyLevel($question->correct_percentage);
-            
-            unset($question->attempts);
-            return $question;
-        });
-
-        return response()->json([
-            'questions' => $questions,
-            'can_edit' => $this->canEditQuiz($quiz)
+        return Inertia::render('Teacher/Questions/Index', [
+            'auth' => [
+                'user' => $this->serializeUserSafely(Auth::user())
+            ],
+            'quiz' => $quiz,
+            'questions' => $quiz->questions
         ]);
     }
 
     /**
-     * Store a new question
+     * Show the form for creating a new question
      */
-    public function store(CreateQuestionRequest $request, Quiz $quiz)
+    public function create(Quiz $quiz)
     {
-        $this->authorize('update', $quiz);
+        $this->authorizeQuizAccess($quiz);
 
-        if (!$this->canEditQuiz($quiz)) {
-            return response()->json(['error' => 'Cannot add questions to this quiz'], 403);
-        }
+        $quiz->load(['batch:id,name']);
+
+        return Inertia::render('Teacher/Questions/Create', [
+            'auth' => [
+                'user' => $this->serializeUserSafely(Auth::user())
+            ],
+            'quiz' => $quiz
+        ]);
+    }
+
+    /**
+     * Store a newly created question
+     */
+    public function store(Request $request, Quiz $quiz)
+    {
+        $this->authorizeQuizAccess($quiz);
+
+        $request->validate([
+            'question_text' => 'required|string|max:2000',
+            'question_type' => 'required|in:mcq,short_answer',
+            'marks' => 'required|integer|min:1|max:100',
+            'options' => 'required_if:question_type,mcq|array|min:2|max:6',
+            'options.*' => 'required_if:question_type,mcq|string|max:500',
+            'correct_answer' => 'required_if:question_type,mcq|string',
+            'explanation' => 'nullable|string|max:1000',
+        ], [
+            'question_text.required' => 'Question text is required.',
+            'question_type.required' => 'Please select a question type.',
+            'marks.required' => 'Marks are required.',
+            'marks.min' => 'Marks must be at least 1.',
+            'marks.max' => 'Marks cannot exceed 100.',
+            'options.required_if' => 'MCQ questions must have at least 2 options.',
+            'options.min' => 'MCQ questions must have at least 2 options.',
+            'options.max' => 'MCQ questions cannot have more than 6 options.',
+            'correct_answer.required_if' => 'Please select the correct answer for MCQ questions.',
+        ]);
 
         DB::beginTransaction();
         
@@ -71,155 +85,221 @@ class QuestionController extends Controller
             // Get the next order number
             $nextOrder = $quiz->questions()->max('order') + 1;
 
-            $question = Question::create([
+            // Prepare question data
+            $questionData = [
                 'quiz_id' => $quiz->id,
-                'type' => $request->type,
                 'question_text' => $request->question_text,
-                'explanation' => $request->explanation,
+                'type' => $request->question_type, // Using 'type' field from your model
                 'marks' => $request->marks,
                 'order' => $nextOrder,
-                'is_required' => $request->is_required ?? true,
-                'options' => $this->processOptions($request->type, $request->options),
-                'correct_answer' => $this->processCorrectAnswer($request->type, $request->correct_answer),
-                'case_sensitive' => $request->case_sensitive ?? false,
-                'partial_credit' => $request->partial_credit ?? false
-            ]);
+            ];
+
+            // Handle MCQ specific data
+            if ($request->question_type === 'mcq') {
+                $options = array_filter($request->options); // Remove empty options
+                $options = array_values($options); // Re-index array
+                
+                if (count($options) < 2) {
+                    return back()->withErrors(['options' => 'MCQ questions must have at least 2 options.']);
+                }
+
+                // Format options for your model structure
+                $formattedOptions = [];
+                foreach ($options as $index => $option) {
+                    $formattedOptions[] = [
+                        'id' => (string)$index,
+                        'text' => $option
+                    ];
+                }
+
+                $questionData['options'] = $formattedOptions;
+                
+                // Find the correct answer index
+                $correctAnswerIndex = array_search($request->correct_answer, $options);
+                $questionData['correct_answer'] = [(string)$correctAnswerIndex];
+                
+                // Validate that correct answer exists in options
+                if ($correctAnswerIndex === false) {
+                    return back()->withErrors(['correct_answer' => 'Correct answer must be one of the provided options.']);
+                }
+            } else {
+                // For short answer questions
+                $questionData['options'] = null;
+                $questionData['correct_answer'] = $request->correct_answer ? [$request->correct_answer] : [];
+            }
+
+            $question = Question::create($questionData);
 
             // Update quiz total marks
-            $this->updateQuizTotalMarks($quiz);
+            $quiz->updateTotalMarks();
 
             DB::commit();
 
-            return response()->json([
-                'message' => 'Question added successfully!',
-                'question' => $question->load('quiz:id,total_marks')
+            // Log the creation
+            \Log::info('Question created', [
+                'question_id' => $question->id,
+                'quiz_id' => $quiz->id,
+                'teacher_id' => Auth::id(),
+                'question_type' => $request->question_type,
+                'marks' => $request->marks
             ]);
-            
+
+            return redirect()->route('teacher.quizzes.questions.index', $quiz)
+                ->with('success', 'Question created successfully!');
+                
         } catch (\Exception $e) {
             DB::rollback();
-            return response()->json(['error' => 'Failed to create question'], 500);
+            \Log::error('Error creating question', [
+                'quiz_id' => $quiz->id,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return back()->withErrors(['error' => 'Failed to create question. Please try again.']);
         }
     }
 
     /**
-     * Display a specific question
+     * Show the form for editing the specified question
      */
-    public function show(Quiz $quiz, Question $question)
+    public function edit(Quiz $quiz, Question $question)
     {
-        $this->authorize('view', $quiz);
+        $this->authorizeQuizAccess($quiz);
+        $this->authorizeQuestionAccess($question, $quiz);
 
-        if ($question->quiz_id !== $quiz->id) {
-            abort(404);
-        }
+        $quiz->load(['batch:id,name']);
 
-        $question->load(['attempts' => function ($q) {
-            $q->with('student:id,name')->latest();
-        }]);
-
-        // Calculate question analytics
-        $totalAttempts = $question->attempts->count();
-        $correctAttempts = $question->attempts->where('is_correct', true)->count();
-        
-        $analytics = [
-            'total_attempts' => $totalAttempts,
-            'correct_attempts' => $correctAttempts,
-            'incorrect_attempts' => $totalAttempts - $correctAttempts,
-            'correct_percentage' => $totalAttempts > 0 ? ($correctAttempts / $totalAttempts) * 100 : 0,
-            'difficulty_level' => $this->calculateDifficultyLevel($totalAttempts > 0 ? ($correctAttempts / $totalAttempts) * 100 : 0)
-        ];
-
-        return response()->json([
-            'question' => $question,
-            'analytics' => $analytics
+        return Inertia::render('Teacher/Questions/Edit', [
+            'auth' => [
+                'user' => $this->serializeUserSafely(Auth::user())
+            ],
+            'quiz' => $quiz,
+            'question' => $question
         ]);
     }
 
     /**
-     * Update a question
+     * Update the specified question
      */
-    public function update(UpdateQuestionRequest $request, Quiz $quiz, Question $question)
+    public function update(Request $request, Quiz $quiz, Question $question)
     {
-        $this->authorize('update', $quiz);
+        $this->authorizeQuizAccess($quiz);
+        $this->authorizeQuestionAccess($question, $quiz);
 
-        if ($question->quiz_id !== $quiz->id) {
-            abort(404);
-        }
-
-        if (!$this->canEditQuiz($quiz)) {
-            return response()->json(['error' => 'Cannot edit questions for this quiz'], 403);
-        }
+        $request->validate([
+            'question_text' => 'required|string|max:2000',
+            'question_type' => 'required|in:mcq,short_answer',
+            'marks' => 'required|integer|min:1|max:100',
+            'options' => 'required_if:question_type,mcq|array|min:2|max:6',
+            'options.*' => 'required_if:question_type,mcq|string|max:500',
+            'correct_answer' => 'required_if:question_type,mcq|string',
+            'explanation' => 'nullable|string|max:1000',
+        ]);
 
         DB::beginTransaction();
         
         try {
-            $question->update([
-                'type' => $request->type,
+            $updateData = [
                 'question_text' => $request->question_text,
-                'explanation' => $request->explanation,
+                'type' => $request->question_type, // Using 'type' field from your model
                 'marks' => $request->marks,
-                'is_required' => $request->is_required ?? true,
-                'options' => $this->processOptions($request->type, $request->options),
-                'correct_answer' => $this->processCorrectAnswer($request->type, $request->correct_answer),
-                'case_sensitive' => $request->case_sensitive ?? false,
-                'partial_credit' => $request->partial_credit ?? false
-            ]);
+            ];
+
+            // Handle MCQ specific data
+            if ($request->question_type === 'mcq') {
+                $options = array_filter($request->options);
+                $options = array_values($options);
+                
+                if (count($options) < 2) {
+                    return back()->withErrors(['options' => 'MCQ questions must have at least 2 options.']);
+                }
+
+                // Format options for your model structure
+                $formattedOptions = [];
+                foreach ($options as $index => $option) {
+                    $formattedOptions[] = [
+                        'id' => (string)$index,
+                        'text' => $option
+                    ];
+                }
+
+                $updateData['options'] = $formattedOptions;
+                
+                // Find the correct answer index
+                $correctAnswerIndex = array_search($request->correct_answer, $options);
+                $updateData['correct_answer'] = [(string)$correctAnswerIndex];
+                
+                if ($correctAnswerIndex === false) {
+                    return back()->withErrors(['correct_answer' => 'Correct answer must be one of the provided options.']);
+                }
+            } else {
+                // Clear MCQ data for short answer questions
+                $updateData['options'] = null;
+                $updateData['correct_answer'] = $request->correct_answer ? [$request->correct_answer] : [];
+            }
+
+            $question->update($updateData);
 
             // Update quiz total marks
-            $this->updateQuizTotalMarks($quiz);
+            $quiz->updateTotalMarks();
 
             DB::commit();
 
-            return response()->json([
-                'message' => 'Question updated successfully!',
-                'question' => $question->fresh()
-            ]);
-            
+            return redirect()->route('teacher.quizzes.questions.index', $quiz)
+                ->with('success', 'Question updated successfully!');
+                
         } catch (\Exception $e) {
             DB::rollback();
-            return response()->json(['error' => 'Failed to update question'], 500);
+            \Log::error('Error updating question', [
+                'question_id' => $question->id,
+                'quiz_id' => $quiz->id,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
+            return back()->withErrors(['error' => 'Failed to update question. Please try again.']);
         }
     }
 
     /**
-     * Delete a question
+     * Remove the specified question
      */
     public function destroy(Quiz $quiz, Question $question)
     {
-        $this->authorize('update', $quiz);
+        $this->authorizeQuizAccess($quiz);
+        $this->authorizeQuestionAccess($question, $quiz);
 
-        if ($question->quiz_id !== $quiz->id) {
-            abort(404);
-        }
-
-        if (!$this->canEditQuiz($quiz)) {
-            return response()->json(['error' => 'Cannot delete questions from this quiz'], 403);
-        }
-
-        if ($question->attempts()->exists()) {
-            return response()->json(['error' => 'Cannot delete question with existing attempts'], 403);
+        // Check if quiz has been attempted
+        if ($quiz->attempts()->count() > 0) {
+            return back()->withErrors(['error' => 'Cannot delete questions from a quiz that has been attempted.']);
         }
 
         DB::beginTransaction();
         
         try {
-            $order = $question->order;
+            $deletedOrder = $question->order;
             $question->delete();
 
             // Reorder remaining questions
             $quiz->questions()
-                ->where('order', '>', $order)
+                ->where('order', '>', $deletedOrder)
                 ->decrement('order');
 
             // Update quiz total marks
-            $this->updateQuizTotalMarks($quiz);
+            $quiz->updateTotalMarks();
 
             DB::commit();
 
-            return response()->json(['message' => 'Question deleted successfully!']);
-            
+            return back()->with('success', 'Question deleted successfully!');
+                
         } catch (\Exception $e) {
             DB::rollback();
-            return response()->json(['error' => 'Failed to delete question'], 500);
+            \Log::error('Error deleting question', [
+                'question_id' => $question->id,
+                'quiz_id' => $quiz->id,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
+            return back()->withErrors(['error' => 'Failed to delete question. Please try again.']);
         }
     }
 
@@ -228,34 +308,36 @@ class QuestionController extends Controller
      */
     public function reorder(Request $request, Quiz $quiz)
     {
-        $this->authorize('update', $quiz);
-
-        if (!$this->canEditQuiz($quiz)) {
-            return response()->json(['error' => 'Cannot reorder questions for this quiz'], 403);
-        }
+        $this->authorizeQuizAccess($quiz);
 
         $request->validate([
             'questions' => 'required|array',
             'questions.*.id' => 'required|exists:questions,id',
-            'questions.*.order' => 'required|integer|min:1'
+            'questions.*.order' => 'required|integer|min:1',
         ]);
 
         DB::beginTransaction();
         
         try {
             foreach ($request->questions as $questionData) {
-                Question::where('id', $questionData['id'])
-                    ->where('quiz_id', $quiz->id)
-                    ->update(['order' => $questionData['order']]);
+                $question = Question::find($questionData['id']);
+                if ($question && $question->quiz_id == $quiz->id) {
+                    $question->update(['order' => $questionData['order']]);
+                }
             }
 
             DB::commit();
 
             return response()->json(['message' => 'Questions reordered successfully!']);
-            
+                
         } catch (\Exception $e) {
             DB::rollback();
-            return response()->json(['error' => 'Failed to reorder questions'], 500);
+            \Log::error('Error reordering questions', [
+                'quiz_id' => $quiz->id,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
+            return response()->json(['error' => 'Failed to reorder questions.'], 500);
         }
     }
 
@@ -264,15 +346,8 @@ class QuestionController extends Controller
      */
     public function duplicate(Quiz $quiz, Question $question)
     {
-        $this->authorize('update', $quiz);
-
-        if ($question->quiz_id !== $quiz->id) {
-            abort(404);
-        }
-
-        if (!$this->canEditQuiz($quiz)) {
-            return response()->json(['error' => 'Cannot duplicate questions for this quiz'], 403);
-        }
+        $this->authorizeQuizAccess($quiz);
+        $this->authorizeQuestionAccess($question, $quiz);
 
         DB::beginTransaction();
         
@@ -283,71 +358,75 @@ class QuestionController extends Controller
             $newQuestion->save();
 
             // Update quiz total marks
-            $this->updateQuizTotalMarks($quiz);
+            $quiz->updateTotalMarks();
 
             DB::commit();
 
-            return response()->json([
-                'message' => 'Question duplicated successfully!',
-                'question' => $newQuestion
-            ]);
-            
+            return back()->with('success', 'Question duplicated successfully!');
+                
         } catch (\Exception $e) {
             DB::rollback();
-            return response()->json(['error' => 'Failed to duplicate question'], 500);
+            \Log::error('Error duplicating question', [
+                'question_id' => $question->id,
+                'quiz_id' => $quiz->id,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
+            return back()->withErrors(['error' => 'Failed to duplicate question. Please try again.']);
         }
     }
 
-    /**
-     * Process options based on question type
-     */
-    private function processOptions($type, $options)
+    // =============================================================================
+    // PRIVATE HELPER METHODS
+    // =============================================================================
+    
+    private function authorizeQuizAccess(Quiz $quiz)
     {
-        if (in_array($type, [QuestionType::MCQ, QuestionType::MULTIPLE_CHOICE, QuestionType::TRUE_FALSE])) {
-            return $options;
+        $user = Auth::user();
+        if (!$user || $quiz->batch->teacher_id !== $user->id) {
+            \Log::warning('Unauthorized quiz access attempt', [
+                'quiz_id' => $quiz->id,
+                'user_id' => $user?->id,
+                'quiz_teacher_id' => $quiz->batch->teacher_id
+            ]);
+            abort(403, 'Access denied.');
         }
-        
-        return null;
     }
 
-    /**
-     * Process correct answer based on question type
-     */
-    private function processCorrectAnswer($type, $correctAnswer)
+    private function authorizeQuestionAccess(Question $question, Quiz $quiz)
     {
-        if (in_array($type, [QuestionType::MCQ, QuestionType::MULTIPLE_CHOICE, QuestionType::TRUE_FALSE])) {
-            return is_array($correctAnswer) ? $correctAnswer : [$correctAnswer];
+        if ($question->quiz_id !== $quiz->id) {
+            \Log::warning('Question does not belong to quiz', [
+                'question_id' => $question->id,
+                'question_quiz_id' => $question->quiz_id,
+                'quiz_id' => $quiz->id
+            ]);
+            abort(404, 'Question not found.');
         }
-        
-        // For short answer questions, store as array to allow multiple acceptable answers
-        return is_array($correctAnswer) ? $correctAnswer : [$correctAnswer];
     }
 
-    /**
-     * Update quiz total marks
-     */
-    private function updateQuizTotalMarks(Quiz $quiz)
+    private function serializeUserSafely($user)
     {
-        $totalMarks = $quiz->questions()->sum('marks');
-        $quiz->update(['total_marks' => $totalMarks]);
-    }
+        if (!$user) {
+            return null;
+        }
 
-    /**
-     * Check if quiz can be edited
-     */
-    private function canEditQuiz(Quiz $quiz)
-    {
-        return $quiz->status === 'draft' || 
-               ($quiz->status === 'active' && $quiz->attempts()->count() === 0);
-    }
+        try {
+            return $user->toArray();
+        } catch (\Exception $e) {
+            \Log::warning('Error serializing user, using fallback', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
 
-    /**
-     * Calculate difficulty level based on correct percentage
-     */
-    private function calculateDifficultyLevel($correctPercentage)
-    {
-        if ($correctPercentage >= 80) return 'Easy';
-        if ($correctPercentage >= 60) return 'Medium';
-        return 'Hard';
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->attributes['role'] ?? 'teacher',
+                'is_active' => $user->is_active ?? true,
+                'is_approved' => $user->is_approved ?? true,
+            ];
+        }
     }
 }
